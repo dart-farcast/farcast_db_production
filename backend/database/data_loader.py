@@ -193,25 +193,80 @@ def build_overlay() -> pd.DataFrame:
 
 
 def load_assay_dfs(assay_paths: dict = None) -> dict:
-    """Return {name: DataFrame} for every assay table in PostgreSQL (Cloud/Local)."""
+    """Return {name: DataFrame} for every assay table in PostgreSQL (Cloud/Local) or fallback files."""
     dfs = {}
     db_url = os.environ.get('DATABASE_URL', '').strip()
-    if not db_url:
-        db_url = "postgresql://farcast:farcastpassword@localhost:5433/farcast_db"
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
 
-    try:
-        from sqlalchemy import create_engine, inspect
-        engine = create_engine(db_url, connect_args={'connect_timeout': 5})
-        insp = inspect(engine)
-        tables = insp.get_table_names()
-        for table in tables:
-            if table.startswith('assay_'):
-                name = table.replace('assay_', '').replace('_', ' ').title()
-                dfs[name] = pd.read_sql_table(table, engine)
-                print(f"  Successfully loaded {len(dfs[name])} rows for {name}.")
-    except Exception as e:
-        print(f"  [Assay Loader Note] PostgreSQL assay connection skipped: {e}")
+    if db_url:
+        try:
+            from sqlalchemy import create_engine, inspect, text
+            engine = create_engine(db_url, connect_args={'connect_timeout': 8})
+            insp = inspect(engine)
+            
+            # 1. Discover all tables with assay_ prefix across default & public schemas
+            all_tables = set(insp.get_table_names())
+            try:
+                all_tables.update(insp.get_table_names(schema='public'))
+            except Exception:
+                pass
+
+            # Known assay tables mapping
+            KNOWN_ASSAYS = {
+                'assay_histopathology': 'Histopathology',
+                'assay_cytokine':       'Cytokine',
+                'assay_nanostring':     'Nanostring',
+                'assay_mihc':           'Mihc'
+            }
+
+            for table in all_tables:
+                if table.startswith('assay_'):
+                    name = table.replace('assay_', '').replace('_', ' ').title()
+                    try:
+                        df = pd.read_sql_query(text(f'SELECT * FROM "{table}"'), engine)
+                        if not df.empty:
+                            dfs[name] = clean_df(df)
+                            print(f"  Successfully loaded {len(df)} rows for {name} from Supabase.")
+                    except Exception as err:
+                        print(f"  [Table Query Note] Error reading {table}: {err}")
+
+            # Also try any known table not found in discovery
+            for tbl, name in KNOWN_ASSAYS.items():
+                if name not in dfs:
+                    try:
+                        df = pd.read_sql_query(text(f'SELECT * FROM "{tbl}"'), engine)
+                        if not df.empty:
+                            dfs[name] = clean_df(df)
+                            print(f"  Successfully loaded {len(df)} rows for {name} from Supabase.")
+                    except Exception:
+                        pass
+
+        except Exception as e:
+            print(f"  [Assay Loader Note] PostgreSQL assay connection note: {e}")
+
+    # Fallback to local files if database is offline or returned 0 assays
+    if not dfs:
+        print("  [Assay Loader Fallback] Loading assays from local cohort data files...")
+        local_mapping = {
+            'Histopathology': ['06Aug2026_histo_cohort.xlsx', '22Jul2026_histo_cohort.xlsx'],
+            'Cytokine':       ['Cytokine_cohort_1_fixed.xlsx'],
+            'Nanostring':     ['Nanostring_currated_data.xlsx'],
+            'Mihc':           ['mIHC image details With Treatment Details_SS 1.xlsx'],
+        }
+        for name, files in local_mapping.items():
+            for f in files:
+                p = os.path.join(COHORT_DIR, f)
+                if os.path.exists(p):
+                    try:
+                        dfs[name] = clean_df(rxlsx(p))
+                        print(f"  Fallback loaded {len(dfs[name])} rows for {name} from {f}")
+                        break
+                    except Exception as err:
+                        print(f"  Failed local fallback for {name}: {err}")
+
     return dfs
+
 
 def build_assay_presence_map(assay_dfs: dict) -> dict:
     presence = {}

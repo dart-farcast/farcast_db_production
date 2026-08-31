@@ -43,10 +43,18 @@ export default function AdminPage() {
       const auditData = await auditRes.json()
       const studyData = await studyRes.json()
 
-      if (wlData.success) setWhitelist(wlData.whitelist || [])
-      if (userData.success) setUsers(userData.users || [])
-      if (auditData.success) setAuditLogs(auditData.logs || [])
-      if (studyData.success) setAvailableStudies(studyData.studies || [])
+      if (wlData?.whitelist) setWhitelist(wlData.whitelist)
+      else if (Array.isArray(wlData)) setWhitelist(wlData)
+
+      if (userData?.users) setUsers(userData.users)
+      else if (Array.isArray(userData)) setUsers(userData)
+
+      if (auditData?.logs) setAuditLogs(auditData.logs)
+      else if (Array.isArray(auditData)) setAuditLogs(auditData)
+
+      if (studyData?.studies) setAvailableStudies(studyData.studies)
+      else if (Array.isArray(studyData)) setAvailableStudies(studyData)
+
     } catch (err) {
       setMsg({ type: 'error', text: err.message || 'Failed to load administration data.' })
     } finally {

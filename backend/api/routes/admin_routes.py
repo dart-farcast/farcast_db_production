@@ -135,7 +135,11 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
             "created_at": u_dict["created_at"],
             "last_login": u_dict["last_login"]
         })
-    return {"users": user_list}
+    return {
+        "success": True,
+        "users": user_list
+    }
+
 
 @router.patch("/users/{user_id}")
 def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depends(get_current_admin_user)):
