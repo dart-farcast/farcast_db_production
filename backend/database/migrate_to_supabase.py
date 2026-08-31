@@ -124,10 +124,31 @@ def run_migration():
     # mIHC
     migrate_assay_file("mIHC", "mIHC image details With Treatment Details_SS 1.xlsx", "assay_mihc", engine)
 
+    # Metadata Table
+    print("\n  Migrating [METADATA] -> Supabase table 'metadata'...")
+    try:
+        from data_loader import load_metadata, build_overlay
+        meta_df = load_metadata()
+        if not meta_df.empty:
+            push_dataframe(meta_df, "metadata", engine)
+    except Exception as e:
+        print(f"  [ERROR] Failed migrating metadata: {e}")
+
+    # Overlay Table
+    print("\n  Migrating [OVERLAY] -> Supabase table 'overlay'...")
+    try:
+        from data_loader import build_overlay
+        overlay_df = build_overlay()
+        if not overlay_df.empty:
+            push_dataframe(overlay_df, "overlay", engine)
+    except Exception as e:
+        print(f"  [ERROR] Failed migrating overlay: {e}")
+
+
     # ── 4. Verify Final Supabase Cloud Tables ────────────────────────────────
     print("\n4. Verifying Tables in Supabase Cloud Database...")
     insp = inspect(engine)
-    tables = [t for t in insp.get_table_names() if t.startswith('assay_') or t in ('users', 'whitelisted_emails', 'audit_logs')]
+    tables = [t for t in insp.get_table_names() if t.startswith('assay_') or t in ('users', 'whitelisted_emails', 'audit_logs', 'metadata', 'overlay')]
     
     print("\n" + "-" * 50)
     print(f"{'Supabase Table Name':<30} | {'Row Count':<15}")
@@ -142,6 +163,7 @@ def run_migration():
     print("-" * 50)
 
     print("\n[SUCCESS] SUPABASE CLOUD DATABASE MIGRATION COMPLETED SUCCESSFULLY!\n")
+
 
 
 if __name__ == '__main__':

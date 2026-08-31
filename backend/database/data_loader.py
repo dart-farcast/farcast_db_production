@@ -99,14 +99,38 @@ def arm_position_cols(df: pd.DataFrame) -> list:
     skip = {'sample_id', 'indication', 'project_id'}
     return [c for c in df.columns if c.lower() not in skip and c.strip()]
 
-def load_metadata() -> pd.DataFrame:
-    df = rxlsx(COHORT_FILE, sheet=COHORT_SHEET)
-    renames = {k: v for k, v in COHORT_COL_MAP.items() if k in df.columns}
-    df = df.rename(columns=renames)
+def clean_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.loc[:, ~df.columns.str.startswith('Unnamed:')]
-    if 'Sample_ID' in df.columns:
-        df = df[df['Sample_ID'].str.strip().ne('')]
-    return df
+    df.columns = df.columns.str.strip().str.replace('\n', ' ')
+    for c in df.select_dtypes('object').columns:
+        df[c] = df[c].str.strip()
+    return df.fillna('')
+
+def load_metadata() -> pd.DataFrame:
+    db_url = os.environ.get('DATABASE_URL', '').strip()
+    if db_url:
+        try:
+            from sqlalchemy import create_engine, inspect
+            engine = create_engine(db_url, connect_args={'connect_timeout': 5})
+            insp = inspect(engine)
+            if insp.has_table('metadata'):
+                df = pd.read_sql_table('metadata', engine)
+                if not df.empty and 'Sample_ID' in df.columns:
+                    print(f"  Successfully loaded {len(df)} metadata rows from Supabase Cloud.")
+                    return clean_df(df)
+        except Exception as e:
+            print(f"  [Metadata Loader Note] Supabase metadata fallback: {e}")
+
+    # Fallback to local excel
+    if os.path.exists(COHORT_FILE):
+        df = rxlsx(COHORT_FILE, sheet=COHORT_SHEET)
+        renames = {k: v for k, v in COHORT_COL_MAP.items() if k in df.columns}
+        df = df.rename(columns=renames)
+        df = df.loc[:, ~df.columns.str.startswith('Unnamed:')]
+        if 'Sample_ID' in df.columns:
+            df = df[df['Sample_ID'].str.strip().ne('')]
+        return df
+    return pd.DataFrame()
 
 def resolve_file(filename, fallback_patterns):
     path = os.path.join(DATA_DIR, filename)
@@ -121,6 +145,21 @@ def resolve_file(filename, fallback_patterns):
     return None
 
 def build_overlay() -> pd.DataFrame:
+    db_url = os.environ.get('DATABASE_URL', '').strip()
+    if db_url:
+        try:
+            from sqlalchemy import create_engine, inspect
+            engine = create_engine(db_url, connect_args={'connect_timeout': 5})
+            insp = inspect(engine)
+            if insp.has_table('overlay'):
+                df = pd.read_sql_table('overlay', engine)
+                if not df.empty and 'Sample_ID' in df.columns:
+                    print(f"  Successfully loaded {len(df)} overlay rows from Supabase Cloud.")
+                    return clean_df(df)
+        except Exception as e:
+            print(f"  [Overlay Loader Note] Supabase overlay fallback: {e}")
+
+    # Fallback to local csv
     arm_path = resolve_file('arm_table.csv', ['*arm_table*.csv', '*arm_table*.xlsx'])
     trt_path = resolve_file('treatment_table.csv', ['*treatment_table*.csv', '*treatment_table*.xlsx'])
 
@@ -151,6 +190,7 @@ def build_overlay() -> pd.DataFrame:
                          'Arm_Code': code.upper(), 'Drug': drug})
     return (pd.DataFrame(rows) if rows
             else pd.DataFrame(columns=['Sample_ID', 'Position', 'Arm_Code', 'Drug']))
+
 
 def load_assay_dfs(assay_paths: dict = None) -> dict:
     """Return {name: DataFrame} for every assay table in PostgreSQL (Cloud/Local)."""
