@@ -85,9 +85,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
 
         # Re-check whitelist dynamically
         if not user_dict['is_whitelisted'] and is_email_whitelisted(user_dict['email']):
-            cursor.execute("UPDATE users SET is_whitelisted = 1 WHERE email = ?", (user_dict['email'],))
+            cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE email = ?", (user_dict['email'],))
             conn.commit()
-            user_dict['is_whitelisted'] = 1
+            user_dict['is_whitelisted'] = True
 
         return user_dict
 

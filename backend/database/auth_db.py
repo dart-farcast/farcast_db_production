@@ -100,10 +100,11 @@ def init_auth_db():
             hashed_pw = hash_password("admin123")
             cursor.execute("""
                 INSERT INTO users (email, full_name, password_hash, role, is_whitelisted, allowed_studies)
-                VALUES (?, ?, ?, ?, 1, '*')
+                VALUES (?, ?, ?, ?, TRUE, '*')
             """, ("admin@farcastbio.com", "Default Admin", hashed_pw, "admin"))
             db.commit()
             print("  [Auth DB] Initialized auth database with default admin: admin@farcastbio.com / admin123")
+
 
 def log_audit_event(actor_email: str, action: str, details: str):
     """Records security audit log entry."""

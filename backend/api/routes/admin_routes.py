@@ -55,10 +55,10 @@ def add_to_whitelist(req: AddWhitelistRequest, current_admin: dict = Depends(get
 
         # Automatically whitelist matching registered users
         if pattern_clean.startswith("@"):
-            cursor.execute("UPDATE users SET is_whitelisted = 1 WHERE LOWER(email) LIKE ?", 
+            cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE LOWER(email) LIKE ?", 
                            (f"%{pattern_clean}",))
         else:
-            cursor.execute("UPDATE users SET is_whitelisted = 1 WHERE LOWER(email) = ?", 
+            cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE LOWER(email) = ?", 
                            (pattern_clean,))
         conn.commit()
 
@@ -83,7 +83,7 @@ def remove_from_whitelist(pattern: str, current_admin: dict = Depends(get_curren
         cursor.execute("SELECT id, email FROM users WHERE role != 'admin'")
         non_admins = cursor.fetchall()
         for u in non_admins:
-            wl_status = 1 if is_email_whitelisted(u['email']) else 0
+            wl_status = bool(is_email_whitelisted(u['email']))
             cursor.execute("UPDATE users SET is_whitelisted = ? WHERE id = ?", (wl_status, u['id']))
         conn.commit()
 
@@ -111,29 +111,37 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, email, full_name, role, is_whitelisted, allowed_studies, created_at, last_login
-            FROM users ORDER BY id ASC
+            FROM users
+            ORDER BY id ASC
         """)
         users = cursor.fetchall()
-        result = []
-        for u in users:
-            u_dict = dict(u)
-            raw = u_dict.get('allowed_studies', '*')
-            if raw != '*' and isinstance(raw, str):
-                u_dict['allowed_studies'] = [s.strip() for s in raw.split(',') if s.strip()]
-            else:
-                u_dict['allowed_studies'] = '*'
-            result.append(u_dict)
-            
-        return {
-            "success": True,
-            "users": result
-        }
+
+    user_list = []
+    for u in users:
+        u_dict = dict(u)
+        raw_studies = u_dict.get("allowed_studies", "*")
+        if raw_studies != "*" and isinstance(raw_studies, str):
+            allowed_studies = [s.strip() for s in raw_studies.split(",") if s.strip()]
+        else:
+            allowed_studies = "*"
+
+        user_list.append({
+            "id": u_dict["id"],
+            "email": u_dict["email"],
+            "full_name": u_dict["full_name"],
+            "role": u_dict["role"],
+            "is_whitelisted": bool(u_dict["is_whitelisted"]),
+            "allowed_studies": allowed_studies,
+            "created_at": u_dict["created_at"],
+            "last_login": u_dict["last_login"]
+        })
+    return {"users": user_list}
 
 @router.patch("/users/{user_id}")
 def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depends(get_current_admin_user)):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        cursor.execute("SELECT id, email, role, is_whitelisted, allowed_studies FROM users WHERE id = ?", (user_id,))
         target_user = cursor.fetchone()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found.")
@@ -148,7 +156,7 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
 
         if req.is_whitelisted is not None:
             updates.append("is_whitelisted = ?")
-            params.append(1 if req.is_whitelisted else 0)
+            params.append(bool(req.is_whitelisted))
 
         if req.allowed_studies is not None:
             if isinstance(req.allowed_studies, list):

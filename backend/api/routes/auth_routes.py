@@ -42,7 +42,7 @@ def register(req: RegisterRequest):
         cursor.execute("""
             INSERT INTO users (email, full_name, password_hash, role, is_whitelisted)
             VALUES (?, ?, ?, 'user', ?)
-        """, (email_clean, req.full_name.strip(), hashed_pw, whitelisted))
+        """, (email_clean, req.full_name.strip(), hashed_pw, bool(whitelisted)))
         conn.commit()
 
         user_id = cursor.lastrowid
@@ -81,8 +81,9 @@ def login(req: LoginRequest):
         # Check / update whitelist status
         is_whitelisted = user_dict["is_whitelisted"]
         if not is_whitelisted and is_email_whitelisted(email_clean):
-            cursor.execute("UPDATE users SET is_whitelisted = 1 WHERE email = ?", (email_clean,))
-            is_whitelisted = 1
+            cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE email = ?", (email_clean,))
+            is_whitelisted = True
+
 
         # Update last login
         cursor.execute("UPDATE users SET last_login = ? WHERE email = ?", 
