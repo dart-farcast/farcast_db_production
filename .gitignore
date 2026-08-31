@@ -1,0 +1,62 @@
+# ==============================================================================
+# FarCast DB v2 — Master Git Ignore Rules
+# Segregates production database code from local temporary & scratch files.
+# ==============================================================================
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# Python & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Local SQLite Databases
+*.db
+*.sqlite
+*.sqlite3
+auth.db
+
+# Node.js / Frontend Builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.npm
+.eslintcache
+
+# Logs & Load Test Output
+*.log
+locust_report.html
+.locust-report.html
+locust_results_*
+
+# IDE & OS Junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary & Non-Production Workspace Directories
+arm_treatment_generater_code/
+cohort_data_files/
+cohort_todo/
+cohort_todo2/
+db_watcher/
+docs_and_assets/
+histopathology_cohort_builder/
+scripts/
+
+# Non-Production Scratch Scripts & Temporary Data Tracking Files
+build_complete_mapping.py
+investigate_root_causes.py
+requested_samples_treatment_details.csv
+DATA_TRACKING_README.md
+farcast_production_resilience_plan.md

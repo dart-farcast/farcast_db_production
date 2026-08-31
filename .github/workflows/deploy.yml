@@ -1,0 +1,88 @@
+name: FarCast DB v2 — CI/CD Pipeline & Live Railway Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-build:
+    name: 🧪 Automated Test & Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 📦 Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install locust pytest starlette httpx
+
+      - name: 🧪 Run Automated Integration & Auth Tests
+        run: |
+          python backend/test_auth_system.py
+          python backend/test_study_access.py
+
+      - name: 🟢 Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 🏗️ Build React Frontend Bundle
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  locust-load-test:
+    name: 🚀 Locust Concurrency Load Test
+    needs: test-and-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 📦 Install Locust & Dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install locust starlette httpx
+
+      - name: ⚡ Run Headless Locust Performance Smoke Test
+        run: |
+          cd backend
+          python -c "import app; import uvicorn, threading; threading.Thread(target=uvicorn.run, args=(app.app,), kwargs={'port': 5052}, daemon=True).start()"
+          sleep 3
+          locust -f locustfile.py --headless -u 25 -r 5 --run-time 15s --host http://localhost:5052
+
+  deploy-railway:
+    name: 🚀 Live Deployment to Railway
+    needs: [test-and-build, locust-load-test]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚂 Deploy to Railway Cloud
+        uses: bervProject/railway-deploy@v1.0.0
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: "farcast-db-v2"

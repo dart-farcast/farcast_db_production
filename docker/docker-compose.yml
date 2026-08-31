@@ -1,0 +1,15 @@
+services:
+  farcast_postgres:
+    image: postgres:13
+    container_name: farcast_postgres
+    environment:
+      POSTGRES_USER: farcast
+      POSTGRES_PASSWORD: farcastpassword
+      POSTGRES_DB: farcast_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

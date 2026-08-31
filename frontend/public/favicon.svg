@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="12" fill="#0A0E21"/>
+  <!-- Farcast Mark Icon -->
+  <g transform="translate(6, 6) scale(0.52)">
+    <!-- Bottom Left Navy Base Loop -->
+    <polygon points="5,85 55,85 75,55 25,55" fill="#1D2758" />
+    <polygon points="5,85 25,55 25,68 5,98" fill="#2D3A74" />
+    <polygon points="25,68 75,68 75,55 25,55" fill="#38BDF8" />
+
+    <!-- Top Right Purple Frame Loop -->
+    <polygon points="45,15 125,15 125,95 102,95 102,38 45,38" fill="#B14FC6" />
+    <polygon points="45,15 45,38 102,38 125,15" fill="#D67FFE" />
+    <polygon points="45,38 45,98 62,82 62,38" fill="#9B3CB0" />
+  </g>
+</svg>
