@@ -24,6 +24,9 @@ ENV/
 *.sqlite
 *.sqlite3
 auth.db
+~$*.xlsx
+~$*.csv
+
 
 # Node.js / Frontend Builds
 node_modules/
