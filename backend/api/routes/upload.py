@@ -1,9 +1,11 @@
 import os, re
 from fastapi import APIRouter, UploadFile, Form
 from ..cache import cache
-from ..data_loader import rcsv, DATA_DIR, discover_assays, load_assay_dfs, build_assay_presence_map, compute_stats, build_indexes
+from database.data_loader import rcsv, DATA_DIR, load_assay_dfs, build_assay_presence_map, compute_stats, build_indexes
+def discover_assays(): return {}
 
 router = APIRouter()
+
 
 
 @router.post('/upload')

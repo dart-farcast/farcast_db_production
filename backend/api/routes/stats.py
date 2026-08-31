@@ -33,7 +33,6 @@ def stats(current_user: dict = Depends(get_current_whitelisted_user)):
     overlay_scoped = cache.overlay[cache.overlay['Sample_ID'].isin(scoped_sids)]
     
     a_samples = {}
-    from ..data_loader import find_col, SID_ALIASES
     for name, df in cache.assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
         if sid_col and sid_col in df.columns:
@@ -71,7 +70,6 @@ def debug():
 
 @router.get('/assay_types')
 def assay_types():
-    from ..data_loader import find_col, SID_ALIASES, ARM_ALIASES
     out = []
     for name, df in cache.assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
@@ -84,6 +82,7 @@ def assay_types():
             'arm_col': arm_col,
         })
     return out
+
 
 
 @router.get('/timepoints')
