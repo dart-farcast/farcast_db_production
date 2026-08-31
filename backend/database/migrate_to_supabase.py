@@ -71,7 +71,7 @@ def migrate_assay_file(label: str, filename: str, table_name: str, engine, sheet
 
 def run_migration():
     print("=" * 70)
-    print("🚀 FARCAST DB v2 — SUPABASE CLOUD POSTGRESQL MIGRATION")
+    print("[MIGRATION] FARCAST DB v2 - SUPABASE CLOUD POSTGRESQL MIGRATION")
     print("=" * 70)
 
     if not DATABASE_URL or 'your-supabase' in DATABASE_URL:
@@ -141,7 +141,8 @@ def run_migration():
                 print(f"{t:<30} | {'N/A':<15}")
     print("-" * 50)
 
-    print("\n🎉 SUPABASE CLOUD DATABASE MIGRATION COMPLETED SUCCESSFULLY!\n")
+    print("\n[SUCCESS] SUPABASE CLOUD DATABASE MIGRATION COMPLETED SUCCESSFULLY!\n")
+
 
 if __name__ == '__main__':
     run_migration()
