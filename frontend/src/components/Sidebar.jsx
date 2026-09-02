@@ -79,11 +79,12 @@ export default function Sidebar({ onSearch }) {
         />
         <MultiSelect
           field="project"
-          label="Project Code"
+          label="Study Code"
           placeholder="e.g. PRJ-001, 1K Study…"
           selected={filters.project}
           onChange={v => setFilter('project', v)}
         />
+
 
 
         <div className="ff">
