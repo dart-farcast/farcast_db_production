@@ -41,8 +41,9 @@ export default function App() {
   add('Arm',        filters.arm)
   add('Indication', filters.indication)
   add('Site',       filters.tumor_site)
-  add('Study',      filters.study)
-  add('Project',    filters.project)
+  add('Study Type', filters.study)
+  add('Project Code', filters.project)
+
   add('Assay',      filters.assay)
   if (filters.sample) activeTags.push({ label: 'Sample', val: filters.sample })
 

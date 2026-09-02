@@ -7,7 +7,8 @@ const COLS = [
   { key: 'toggle',       label: '',            w: 28   },
   { key: 'Sample_ID',    label: 'Sample ID',   w: 130  },
   { key: 'CancerType',   label: 'Indication',  w: 130  },
-  { key: 'Study',        label: 'Study',       w: 110  },
+  { key: 'Study',        label: 'Study Type',  w: 120  },
+
   { key: 'TumorSite',    label: 'Tumor Site',  w: 110  },
   { key: 'Gender',       label: 'Gender',      w: 70   },
   { key: 'arms',         label: 'Arms / Drug', w: 160  },

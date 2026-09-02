@@ -72,18 +72,19 @@ export default function Sidebar({ onSearch }) {
         />
         <MultiSelect
           field="study"
-          label="Study"
+          label="Study Type"
           placeholder="e.g. BioBank, Biopharma, Internal R&D…"
           selected={filters.study}
           onChange={v => setFilter('study', v)}
         />
         <MultiSelect
           field="project"
-          label="Project"
+          label="Project Code"
           placeholder="e.g. PRJ-001, 1K Study…"
           selected={filters.project}
           onChange={v => setFilter('project', v)}
         />
+
 
         <div className="ff">
           <label>Sample ID (partial match)</label>
