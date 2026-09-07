@@ -1,29 +1,22 @@
 from typing import Optional, List, Union
-from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, status, Request
+from pydantic import BaseModel, Field
 from ..auth import get_db, get_current_admin_user, is_email_whitelisted
 from ..cache import cache
+from database.auth_db import log_audit_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 class AddWhitelistRequest(BaseModel):
-    pattern: str
-    notes: Optional[str] = ""
+    pattern: str = Field(..., min_length=1, max_length=255)
+    notes: Optional[str] = Field(default="", max_length=500)
 
 class UpdateUserRequest(BaseModel):
-    role: Optional[str] = None
+    role: Optional[str] = Field(default=None, max_length=20)
     is_whitelisted: Optional[bool] = None
     allowed_studies: Optional[Union[List[str], str]] = None
 
-def log_audit(actor_email: str, action: str, details: str):
-    try:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO audit_logs (actor_email, action, details) VALUES (?, ?, ?)",
-                           (actor_email, action, details))
-            conn.commit()
-    except Exception:
-        pass
+ALLOWED_USER_COLUMNS = {"role", "is_whitelisted", "allowed_studies"}
 
 @router.get("/whitelist")
 def list_whitelisted_emails(current_admin: dict = Depends(get_current_admin_user)):
@@ -37,10 +30,12 @@ def list_whitelisted_emails(current_admin: dict = Depends(get_current_admin_user
         }
 
 @router.post("/whitelist")
-def add_to_whitelist(req: AddWhitelistRequest, current_admin: dict = Depends(get_current_admin_user)):
+def add_to_whitelist(req: AddWhitelistRequest, request: Request, current_admin: dict = Depends(get_current_admin_user)):
     pattern_clean = req.pattern.strip().lower()
     if not pattern_clean:
         raise HTTPException(status_code=400, detail="Whitelist pattern cannot be empty.")
+
+    req_id = getattr(request.state, "request_id", "")
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -62,7 +57,7 @@ def add_to_whitelist(req: AddWhitelistRequest, current_admin: dict = Depends(get
                            (pattern_clean,))
         conn.commit()
 
-    log_audit(current_admin["email"], "ADD_WHITELIST", f"Added '{pattern_clean}' to whitelist.")
+    log_audit_event(current_admin["email"], "ADD_WHITELIST", f"Added '{pattern_clean}' to whitelist.", req_id)
 
     return {
         "success": True,
@@ -70,8 +65,9 @@ def add_to_whitelist(req: AddWhitelistRequest, current_admin: dict = Depends(get
     }
 
 @router.delete("/whitelist/{pattern:path}")
-def remove_from_whitelist(pattern: str, current_admin: dict = Depends(get_current_admin_user)):
+def remove_from_whitelist(pattern: str, request: Request, current_admin: dict = Depends(get_current_admin_user)):
     pattern_clean = pattern.strip().lower()
+    req_id = getattr(request.state, "request_id", "")
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM whitelisted_emails WHERE pattern = ?", (pattern_clean,))
@@ -87,7 +83,7 @@ def remove_from_whitelist(pattern: str, current_admin: dict = Depends(get_curren
             cursor.execute("UPDATE users SET is_whitelisted = ? WHERE id = ?", (wl_status, u['id']))
         conn.commit()
 
-    log_audit(current_admin["email"], "REMOVE_WHITELIST", f"Removed '{pattern_clean}' from whitelist.")
+    log_audit_event(current_admin["email"], "REMOVE_WHITELIST", f"Removed '{pattern_clean}' from whitelist.", req_id)
 
     return {
         "success": True,
@@ -140,9 +136,9 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
         "users": user_list
     }
 
-
 @router.patch("/users/{user_id}")
-def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depends(get_current_admin_user)):
+def update_user(user_id: int, req: UpdateUserRequest, request: Request, current_admin: dict = Depends(get_current_admin_user)):
+    req_id = getattr(request.state, "request_id", "")
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, email, role, is_whitelisted, allowed_studies FROM users WHERE id = ?", (user_id,))
@@ -154,7 +150,9 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
         updates = []
         params = []
 
-        if req.role is not None and req.role in ['admin', 'user']:
+        if req.role is not None:
+            if req.role not in ['admin', 'user']:
+                raise HTTPException(status_code=400, detail="Role must be either 'admin' or 'user'.")
             updates.append("role = ?")
             params.append(req.role)
 
@@ -177,11 +175,14 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
             raise HTTPException(status_code=400, detail="No valid update fields provided.")
 
         params.append(user_id)
-        cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+        # Verify all update columns are strictly allowlisted
+        clause = ', '.join([u for u in updates if u.split(' =')[0] in ALLOWED_USER_COLUMNS])
+        cursor.execute(f"UPDATE users SET {clause} WHERE id = ?", params)
         conn.commit()
 
-    log_audit(current_admin["email"], "UPDATE_USER", 
-              f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, whitelisted={req.is_whitelisted}, allowed_studies={req.allowed_studies}")
+    log_audit_event(current_admin["email"], "UPDATE_USER", 
+                    f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, whitelisted={req.is_whitelisted}, allowed_studies={req.allowed_studies}",
+                    req_id)
 
     return {
         "success": True,
@@ -189,7 +190,8 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
     }
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, current_admin: dict = Depends(get_current_admin_user)):
+def delete_user(user_id: int, request: Request, current_admin: dict = Depends(get_current_admin_user)):
+    req_id = getattr(request.state, "request_id", "")
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, email FROM users WHERE id = ?", (user_id,))
@@ -206,7 +208,7 @@ def delete_user(user_id: int, current_admin: dict = Depends(get_current_admin_us
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
 
-    log_audit(current_admin["email"], "DELETE_USER", f"Permanently deleted user ID {user_id} ({target_dict['email']})")
+    log_audit_event(current_admin["email"], "DELETE_USER", f"Permanently deleted user ID {user_id} ({target_dict['email']})", req_id)
 
     return {
         "success": True,
@@ -217,11 +219,12 @@ def delete_user(user_id: int, current_admin: dict = Depends(get_current_admin_us
 def get_audit_logs(current_admin: dict = Depends(get_current_admin_user)):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 50")
+        cursor.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
         logs = cursor.fetchall()
         return {
             "success": True,
             "logs": [dict(l) for l in logs]
         }
+
 
 

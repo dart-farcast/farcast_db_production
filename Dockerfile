@@ -32,21 +32,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
+# Create unprivileged runtime user
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+
 # Copy backend code & database isolation module
-COPY backend/ ./backend/
-COPY data/ ./data/
+COPY --chown=appuser:appuser backend/ ./backend/
+COPY --chown=appuser:appuser data/ ./data/
 
 # Copy built React SPA static assets into frontend/dist
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/dist ./frontend/dist
 
 # Expose server port
 EXPOSE 5052
 
 WORKDIR /app/backend
 
+# Switch to unprivileged runtime user
+USER appuser
+
 # Healthcheck endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-5052}/api/hardcode || exit 1
+  CMD curl -f http://localhost:${PORT:-5052}/health/ready || exit 1
 
 # Launch production server with Uvicorn
 CMD exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-5052}
+

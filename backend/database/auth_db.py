@@ -26,6 +26,30 @@ def verify_password(password: str, stored_hash: str) -> bool:
     except Exception:
         return False
 
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validates password against security baseline:
+    - Minimum 8 characters, maximum 128 characters
+    - Must contain at least one uppercase letter, one lowercase letter, and one digit
+    - Rejects common trivial passwords
+    """
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if len(password) > 128:
+        return False, "Password cannot exceed 128 characters."
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least one uppercase letter."
+    if not any(c.islower() for c in password):
+        return False, "Password must contain at least one lowercase letter."
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one numeric digit."
+    
+    common_weak = {"password", "password123", "admin1234", "qwerty123", "letmein123", "farcast123"}
+    if password.lower() in common_weak:
+        return False, "Password is too common or easily guessable. Please choose a stronger password."
+
+    return True, ""
+
 def is_email_whitelisted(email: str) -> bool:
     """Checks if an email matches a whitelisted email or domain pattern."""
     email_clean = email.strip().lower()
@@ -78,7 +102,18 @@ def init_auth_db():
                 actor_email TEXT,
                 action TEXT NOT NULL,
                 details TEXT,
+                request_id TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Token blacklist table (Revoked JWTs)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS token_blacklist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                jti TEXT UNIQUE NOT NULL,
+                revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP
             )
         """)
         db.commit()
@@ -106,13 +141,38 @@ def init_auth_db():
             print("  [Auth DB] Initialized auth database with default admin: admin@farcastbio.com / admin123")
 
 
-def log_audit_event(actor_email: str, action: str, details: str):
-    """Records security audit log entry."""
+def revoke_token(jti: str, expires_at: Optional[str] = None):
+    """Adds a JWT token identifier (jti) to the revocation blacklist."""
+    if not jti:
+        return
     try:
         with get_db_connection() as db:
             cursor = db.cursor()
-            cursor.execute("INSERT INTO audit_logs (actor_email, action, details) VALUES (?, ?, ?)",
-                           (actor_email, action, details))
+            cursor.execute("INSERT INTO token_blacklist (jti, expires_at) VALUES (?, ?)", (jti, expires_at))
             db.commit()
     except Exception:
         pass
+
+def is_token_revoked(jti: str) -> bool:
+    """Checks if a JWT jti exists in the revocation blacklist."""
+    if not jti:
+        return False
+    try:
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute("SELECT id FROM token_blacklist WHERE jti = ?", (jti,))
+            return cursor.fetchone() is not None
+    except Exception:
+        return False
+
+def log_audit_event(actor_email: str, action: str, details: str, request_id: Optional[str] = None):
+    """Records security audit log entry with optional request correlation ID."""
+    try:
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute("INSERT INTO audit_logs (actor_email, action, details, request_id) VALUES (?, ?, ?, ?)",
+                           (actor_email, action, details, request_id or ""))
+            db.commit()
+    except Exception:
+        pass
+

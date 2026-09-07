@@ -1,18 +1,20 @@
 """
 Search endpoint — multi-select, index-based, all filters correctly intersected.
 
-Fixes vs v1:
-  - Arm filter: keys now lowercase → matches correctly
-  - Assay filter: restricts final_sids to samples present in selected assay
-  - Indication/study/site/project: use partial matching (so "HNSCC" matches "HNSCC")
-  - Multi-filter: proper AND intersection across all fields
+Hardened with:
+  - Strict server-side study scoping on search, sample assays, and cohort assays
+  - IDOR / BOLA authorization checks
+  - Input length and list bounds
 """
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from typing import List
+from fastapi import APIRouter, Depends, Query, HTTPException, status
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from ..cache import cache
 from database.data_loader import find_col, SID_ALIASES, ARM_ALIASES
-from ..auth import get_current_whitelisted_user
+from ..auth import (
+    get_current_whitelisted_user, verify_user_sample_access,
+    filter_samples_by_user_scope
+)
 import pandas as pd
 
 
@@ -21,7 +23,10 @@ router = APIRouter()
 
 def _parse_multi(value: str) -> list:
     """Split comma-separated param, strip whitespace, drop empties."""
-    return [v.strip() for v in value.split(',') if v.strip()]
+    if not value or not isinstance(value, str):
+        return []
+    # Limit max number of tokens to 50
+    return [v.strip()[:100] for v in value.split(',') if v.strip()][:50]
 
 
 def _index_match(index: dict, terms: list, partial: bool = True) -> set:
@@ -48,17 +53,17 @@ def _index_match(index: dict, terms: list, partial: bool = True) -> set:
 
 @router.get('/search')
 def search(
-    drug:           str = '',
-    arm:            str = '',
-    sample:         str = '',
-    indication:     str = '',
-    tumor_site:     str = '',
-    study:          str = '',
-    project:        str = '',
-    assay:          str = '',   # comma-separated assay display names
-    timepoint:      str = '',
-    qualified_only: str = '',
-    qualified:      str = '',
+    drug:           str = Query(default='', max_length=500),
+    arm:            str = Query(default='', max_length=500),
+    sample:         str = Query(default='', max_length=100),
+    indication:     str = Query(default='', max_length=500),
+    tumor_site:     str = Query(default='', max_length=500),
+    study:          str = Query(default='', max_length=500),
+    project:        str = Query(default='', max_length=500),
+    assay:          str = Query(default='', max_length=500),   # comma-separated assay display names
+    timepoint:      str = Query(default='', max_length=100),
+    qualified_only: str = Query(default='', max_length=10),
+    qualified:      str = Query(default='', max_length=10),
     current_user: dict = Depends(get_current_whitelisted_user),
 ):
     idx      = cache.indexes
@@ -75,7 +80,7 @@ def search(
     assay_list = _parse_multi(assay)
 
     # Start from the full sample universe
-    final_sids: set = idx['all_sids'].copy()
+    final_sids: set = idx.get('all_sids', set()).copy()
 
     # ── Qualification Status Filter ─────────────────────────────────────────
     is_qual = qualified_only.strip().lower() in ('true', '1', 'yes') or qualified.strip().lower() in ('true', '1', 'yes')
@@ -85,37 +90,34 @@ def search(
     # ── 0. Mandatory User Study Scoping ──────────────────────────────────────
     allowed_studies = current_user.get('allowed_studies', '*')
     if allowed_studies != '*' and isinstance(allowed_studies, list):
-        scoped_sids = _index_match(idx['study'], allowed_studies, partial=False)
+        scoped_sids = _index_match(idx.get('study', {}), allowed_studies, partial=False)
         final_sids &= scoped_sids
 
-
     # ── 1. Assay pre-filter: samples must be present in ALL selected assays (AND) ──
-    # Starting from all_sids and intersecting ensures empty assay_sids_map entries
-    # still correctly zero out the results.
     if assay_list:
-        assay_universe: set = idx['all_sids'].copy()  # start full
+        assay_universe: set = idx.get('all_sids', set()).copy()
         for aname in assay_list:
             sids_for_assay = cache.assay_sids_map.get(aname, set())
-            assay_universe &= sids_for_assay           # AND: must be in every assay
+            assay_universe &= sids_for_assay
         final_sids &= assay_universe
 
     # ── 2. Drug filter (partial match) ────────────────────────────────────────
     if drugs:
-        final_sids &= _index_match(idx['drug'], drugs, partial=True)
+        final_sids &= _index_match(idx.get('drug', {}), drugs, partial=True)
 
     # ── 3. Arm filter (partial match, index keys are lowercase) ───────────────
     if arms:
-        final_sids &= _index_match(idx['arm'], arms, partial=True)
+        final_sids &= _index_match(idx.get('arm', {}), arms, partial=True)
 
     # ── 4. Metadata filters (partial match so partial typing still works) ─────
     if indications:
-        final_sids &= _index_match(idx['cancer'], indications, partial=True)
+        final_sids &= _index_match(idx.get('cancer', {}), indications, partial=True)
     if sites:
-        final_sids &= _index_match(idx['site'], sites, partial=True)
+        final_sids &= _index_match(idx.get('site', {}), sites, partial=True)
     if studies:
-        final_sids &= _index_match(idx['study'], studies, partial=True)
+        final_sids &= _index_match(idx.get('study', {}), studies, partial=True)
     if projects:
-        final_sids &= _index_match(idx['project'], projects, partial=True)
+        final_sids &= _index_match(idx.get('project', {}), projects, partial=True)
 
     # ── 5. Sample ID substring filter ────────────────────────────────────────
     if sample:
@@ -212,17 +214,28 @@ def search(
 
 
 @router.get('/sample_assays')
-def sample_assays(sample_id: str = ''):
-    """Return all assay rows for one sample across every assay type."""
+def sample_assays(
+    sample_id: str = Query(default='', max_length=100),
+    current_user: dict = Depends(get_current_whitelisted_user)
+):
+    """Return all assay rows for one sample across every assay type, enforcing study access."""
     if not sample_id:
         return {}
     sid = sample_id.strip()
+
+    # Enforce study authorization (IDOR protection)
+    if not verify_user_sample_access(current_user, sid):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: You do not have permission to view assay data for sample '{sid}'."
+        )
+
     result = {}
     for name, df in cache.assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
         if not sid_col:
             continue
-        rows = df[df[sid_col].str.strip() == sid]
+        rows = df[df[sid_col].astype(str).str.strip() == sid]
         if not rows.empty:
             result[name] = {
                 'columns': list(rows.columns),
@@ -231,15 +244,23 @@ def sample_assays(sample_id: str = ''):
     return result
 
 class CohortRequest(BaseModel):
-    sample_ids: List[str]
+    sample_ids: List[str] = Field(..., max_items=2500)
 
 @router.post('/cohort_assays')
-def cohort_assays(req: CohortRequest):
-    """Return all assay rows for multiple samples across every assay type."""
+def cohort_assays(
+    req: CohortRequest,
+    current_user: dict = Depends(get_current_whitelisted_user)
+):
+    """Return all assay rows for multiple samples, strictly filtered by user's permitted study scope."""
     if not req.sample_ids:
         return {}
-    sids = {sid.strip() for sid in req.sample_ids if sid.strip()}
-    if not sids:
+    raw_sids = [sid.strip() for sid in req.sample_ids if isinstance(sid, str) and sid.strip()]
+    if not raw_sids:
+        return {}
+
+    # Enforce study authorization (IDOR / BOLA protection)
+    permitted_sids = filter_samples_by_user_scope(current_user, raw_sids)
+    if not permitted_sids:
         return {}
     
     result = {}
@@ -247,10 +268,11 @@ def cohort_assays(req: CohortRequest):
         sid_col = find_col(df, SID_ALIASES)
         if not sid_col:
             continue
-        rows = df[df[sid_col].astype(str).str.strip().isin(sids)]
+        rows = df[df[sid_col].astype(str).str.strip().isin(permitted_sids)]
         if not rows.empty:
             result[name] = {
                 'columns': list(rows.columns),
                 'rows':    rows.to_dict(orient='records'),
             }
     return result
+

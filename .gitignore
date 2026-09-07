@@ -52,14 +52,10 @@ arm_treatment_generater_code/
 cohort_data_files/
 cohort_todo/
 cohort_todo2/
-BP013 cohort/
-sample(n=4)/
 db_watcher/
 docs_and_assets/
 histopathology_cohort_builder/
 scripts/
-
-
 
 # Non-Production Scratch Scripts & Temporary Data Tracking Files
 build_complete_mapping.py
