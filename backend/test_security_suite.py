@@ -13,15 +13,15 @@ from app import app
 from database.auth_db import get_db_connection, hash_password, validate_password_strength
 from api.cache import cache, reload_cache
 
-client = TestClient(app)
-
 def run_security_tests():
     print("\n" + "=" * 70)
     print("  FARCAST DB v2 — AUTOMATED PRODUCTION SECURITY & RESILIENCE TEST SUITE")
     print("=" * 70 + "\n")
 
-    passed_count = 0
-    total_count = 0
+    with TestClient(app) as client:
+        passed_count = 0
+        total_count = 0
+
 
     def assert_test(condition: bool, description: str):
         nonlocal passed_count, total_count

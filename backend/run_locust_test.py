@@ -21,11 +21,27 @@ def run_benchmark():
         kwargs={"host": "127.0.0.1", "port": 5052, "log_level": "error"},
         daemon=True
     )
-    server_thread.start()
-    time.sleep(3)
+    # Wait for server readiness probe
+    print("  Waiting for server initialization and cache readiness at http://127.0.0.1:5052/health/ready...")
+    import requests
+    ready = False
+    for _ in range(60):
+        try:
+            r = requests.get("http://127.0.0.1:5052/health/ready", timeout=2)
+            if r.status_code == 200 and r.json().get("status") == "ready":
+                ready = True
+                break
+        except Exception:
+            pass
+        time.sleep(1)
 
-    print("  Server active on http://127.0.0.1:5052. Launching Locust benchmark...")
+    if not ready:
+        print("  [ERROR] Server failed readiness check within timeout.")
+        return
+
+    print("  Server active and ready on http://127.0.0.1:5052. Launching Locust benchmark...")
     print("  Simulating 50 Concurrent Users (Hatch Rate: 10 users/sec, Duration: 20s)\n")
+
 
     # Run Locust CLI
     cmd = [
