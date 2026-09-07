@@ -260,22 +260,38 @@ def hardcode():
     }
 
 
-# ── 8. Serve React Production Build ──────────────────────────────────────────
+# ── 8. Serve React Production Build with Aggressive Asset Caching ────────────
 
 FRONTEND_DIST = os.path.normpath(
     os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
 
+class CachedStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs) -> Response:
+        resp = super().file_response(*args, **kwargs)
+        # Hashed assets in /assets are immutable and cached for 1 year
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
 if os.path.isdir(FRONTEND_DIST):
     assets_dir = os.path.join(FRONTEND_DIST, 'assets')
     if os.path.isdir(assets_dir):
-        app.mount('/assets', StaticFiles(directory=assets_dir), name='assets')
+        app.mount('/assets', CachedStaticFiles(directory=assets_dir), name='assets')
 
     @app.get('/{full_path:path}', include_in_schema=False)
     def spa_fallback(full_path: str):
         target = os.path.normpath(os.path.join(FRONTEND_DIST, full_path))
         if os.path.isfile(target):
-            return FileResponse(target)
-        return FileResponse(os.path.join(FRONTEND_DIST, 'index.html'))
+            res = FileResponse(target)
+            if any(full_path.endswith(ext) for ext in ('.png', '.jpg', '.jpeg', '.svg', '.ico', '.woff', '.woff2', '.webmanifest')):
+                res.headers["Cache-Control"] = "public, max-age=86400"
+            return res
+        
+        # index.html should not be aggressively cached to allow instant updates on deployment
+        res = FileResponse(os.path.join(FRONTEND_DIST, 'index.html'))
+        res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        res.headers["Pragma"] = "no-cache"
+        res.headers["Expires"] = "0"
+        return res
 else:
     @app.get('/')
     def root():

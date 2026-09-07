@@ -1,7 +1,7 @@
 from typing import Optional, List, Union
 from fastapi import APIRouter, HTTPException, Depends, status, Request
 from pydantic import BaseModel, Field
-from ..auth import get_db, get_current_admin_user, is_email_whitelisted
+from ..auth import get_db, get_current_admin_user, is_email_whitelisted, clear_user_cache
 from ..cache import cache
 from database.auth_db import log_audit_event
 
@@ -57,6 +57,7 @@ def add_to_whitelist(req: AddWhitelistRequest, request: Request, current_admin: 
                            (pattern_clean,))
         conn.commit()
 
+    clear_user_cache()
     log_audit_event(current_admin["email"], "ADD_WHITELIST", f"Added '{pattern_clean}' to whitelist.", req_id)
 
     return {
@@ -83,6 +84,7 @@ def remove_from_whitelist(pattern: str, request: Request, current_admin: dict = 
             cursor.execute("UPDATE users SET is_whitelisted = ? WHERE id = ?", (wl_status, u['id']))
         conn.commit()
 
+    clear_user_cache()
     log_audit_event(current_admin["email"], "REMOVE_WHITELIST", f"Removed '{pattern_clean}' from whitelist.", req_id)
 
     return {
@@ -180,6 +182,7 @@ def update_user(user_id: int, req: UpdateUserRequest, request: Request, current_
         cursor.execute(f"UPDATE users SET {clause} WHERE id = ?", params)
         conn.commit()
 
+    clear_user_cache(target_dict['email'])
     log_audit_event(current_admin["email"], "UPDATE_USER", 
                     f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, whitelisted={req.is_whitelisted}, allowed_studies={req.allowed_studies}",
                     req_id)
@@ -208,6 +211,7 @@ def delete_user(user_id: int, request: Request, current_admin: dict = Depends(ge
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
 
+    clear_user_cache(target_dict['email'])
     log_audit_event(current_admin["email"], "DELETE_USER", f"Permanently deleted user ID {user_id} ({target_dict['email']})", req_id)
 
     return {

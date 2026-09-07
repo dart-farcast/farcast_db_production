@@ -142,7 +142,7 @@ def search(
         matched_pairs = set(zip(ov_filtered[mask]['Sample_ID'],
                                 ov_filtered[mask]['Arm_Code']))
     else:
-        matched_pairs = set(zip(ov_filtered['Sample_ID'], ov_filtered['Arm_Code']))
+        matched_pairs = set()
 
     # ── 7. Load assay row data for selected assays ────────────────────────────
     assay_by_sid: dict = {}
@@ -185,22 +185,29 @@ def search(
                 assay_by_sid.setdefault(sid, []).extend(
                     grp.to_dict(orient='records'))
 
-    # ── 8. Assemble per-sample results ────────────────────────────────────────
+    # ── 8. Assemble per-sample results in O(N) single pass ───────────────────
     meta_idx       = cache.meta_idx
     assay_presence = cache.assay_presence
-    results = []
+    
+    # Pre-group overlay records by Sample_ID
+    ov_by_sid = {}
+    for r in ov_filtered.to_dict(orient='records'):
+        sid_val = r.get('Sample_ID', '')
+        if sid_val:
+            ov_by_sid.setdefault(sid_val, []).append(r)
 
+    results = []
     for sid in sorted(final_sids):
         m_dict    = meta_idx.get(sid, {'Sample_ID': sid})
-        sample_ov = ov_filtered[ov_filtered['Sample_ID'] == sid]
+        sample_ov = ov_by_sid.get(sid, [])
         arms_out  = [
             {
                 'position': r['Position'],
                 'arm_code': r['Arm_Code'],
                 'drug':     r['Drug'],
-                'matched':  (sid, r['Arm_Code']) in matched_pairs,
+                'matched':  ((sid, r['Arm_Code']) in matched_pairs) if any_arm_drug_filter else True,
             }
-            for _, r in sample_ov.iterrows()
+            for r in sample_ov
         ]
         results.append({
             'metadata':       m_dict,

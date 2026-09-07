@@ -4,9 +4,8 @@ SQLite database management, password hashing, JWT tokens, and security helpers.
 """
 import os
 import sqlite3
-import hashlib
-import secrets
 import uuid
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Iterable, Set, Dict, Any
 import jwt
@@ -83,11 +82,22 @@ def decode_access_token(token: str) -> dict:
 # Initialize database on import
 init_auth_db()
 
+# In-memory user cache for instant token authorization (TTL: 60s)
+_USER_CACHE: Dict[str, tuple[float, dict]] = {}
+
+def clear_user_cache(email: Optional[str] = None):
+    """Invalidates the user memory cache for a specific email or all users."""
+    global _USER_CACHE
+    if email:
+        _USER_CACHE.pop(email.strip().lower(), None)
+    else:
+        _USER_CACHE.clear()
+
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security_scheme)):
-    """FastAPI dependency to extract and return current authenticated user."""
+    """FastAPI dependency to extract and return current authenticated user with caching."""
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -98,6 +108,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     email = payload.get("sub")
     if not email:
         raise HTTPException(status_code=401, detail="Invalid token payload.")
+    
+    clean_email = email.strip().lower()
+    now_ts = time.time()
+
+    # Fast in-memory cache check (TTL: 60 seconds)
+    if clean_email in _USER_CACHE:
+        cached_ts, cached_user = _USER_CACHE[clean_email]
+        if now_ts - cached_ts < 60:
+            user_dict = dict(cached_user)
+            user_dict['token_jti'] = payload.get("jti")
+            user_dict['token_exp'] = payload.get("exp")
+            return user_dict
     
     with get_db() as conn:
         cursor = conn.cursor()
@@ -114,15 +136,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         else:
             user_dict['allowed_studies'] = '*'
 
-        # Attach token metadata for session management / logout
-        user_dict['token_jti'] = payload.get("jti")
-        user_dict['token_exp'] = payload.get("exp")
-
         # Re-check whitelist dynamically
         if not user_dict['is_whitelisted'] and is_email_whitelisted(user_dict['email']):
             cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE email = ?", (user_dict['email'],))
             conn.commit()
             user_dict['is_whitelisted'] = True
+
+        # Store in cache
+        _USER_CACHE[clean_email] = (now_ts, dict(user_dict))
+
+        # Attach token metadata for session management / logout
+        user_dict['token_jti'] = payload.get("jti")
+        user_dict['token_exp'] = payload.get("exp")
 
         return user_dict
 

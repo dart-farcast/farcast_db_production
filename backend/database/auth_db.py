@@ -118,6 +118,12 @@ def init_auth_db():
         """)
         db.commit()
 
+        # Populate in-memory blacklist cache on init
+        cursor.execute("SELECT jti FROM token_blacklist")
+        for r in cursor.fetchall():
+            if r.get('jti'):
+                _REVOKED_JTIS.add(r['jti'])
+
         # Seed default whitelist rules if empty
         cursor.execute("SELECT COUNT(*) as cnt FROM whitelisted_emails")
         row = cursor.fetchone()
@@ -141,10 +147,13 @@ def init_auth_db():
             print("  [Auth DB] Initialized auth database with default admin: admin@farcastbio.com / admin123")
 
 
+_REVOKED_JTIS: set[str] = set()
+
 def revoke_token(jti: str, expires_at: Optional[str] = None):
-    """Adds a JWT token identifier (jti) to the revocation blacklist."""
+    """Adds a JWT token identifier (jti) to the revocation blacklist and memory set."""
     if not jti:
         return
+    _REVOKED_JTIS.add(jti)
     try:
         with get_db_connection() as db:
             cursor = db.cursor()
@@ -154,16 +163,10 @@ def revoke_token(jti: str, expires_at: Optional[str] = None):
         pass
 
 def is_token_revoked(jti: str) -> bool:
-    """Checks if a JWT jti exists in the revocation blacklist."""
+    """Checks if a JWT jti exists in the revocation blacklist (0ms memory check)."""
     if not jti:
         return False
-    try:
-        with get_db_connection() as db:
-            cursor = db.cursor()
-            cursor.execute("SELECT id FROM token_blacklist WHERE jti = ?", (jti,))
-            return cursor.fetchone() is not None
-    except Exception:
-        return False
+    return jti in _REVOKED_JTIS
 
 def log_audit_event(actor_email: str, action: str, details: str, request_id: Optional[str] = None):
     """Records security audit log entry with optional request correlation ID."""
