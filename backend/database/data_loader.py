@@ -11,7 +11,8 @@ DATA_DIR     = os.path.normpath(os.path.join(_HERE, '..', '..', 'data'))
 COHORT_DIR   = os.path.join(DATA_DIR, 'latest cohort data')
 COHORT_FILE  = os.path.join(COHORT_DIR, 'Farcast Tissue sample 2020 to 2025.xlsx')
 COHORT_SHEET = 'All Data'
-CORE_FILES   = {'arm_table.csv', 'treatment_table.csv', 'metadata_table.csv'}
+CORE_FILES   = {'metadata_table.csv'}
+
 SID_ALIASES  = ['sample_id', 'sampleid', 'sample id', 'register']
 ARM_ALIASES  = ['arms', 'arm', 'arm_code', 'treatment arms']
 
@@ -144,8 +145,13 @@ def resolve_file(filename, fallback_patterns):
                 return matches[0]
     return None
 
-def build_overlay() -> pd.DataFrame:
+def build_overlay(assay_dfs: dict = None) -> pd.DataFrame:
+    """Build clean overlay mapping directly from verified assay datasets and database."""
+    # 1. If database has an overlay table, attempt to load
     db_url = os.environ.get('DATABASE_URL', '').strip()
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+
     if db_url:
         try:
             from sqlalchemy import create_engine, inspect
@@ -157,39 +163,27 @@ def build_overlay() -> pd.DataFrame:
                     print(f"  Successfully loaded {len(df)} overlay rows from Supabase Cloud.")
                     return clean_df(df)
         except Exception as e:
-            print(f"  [Overlay Loader Note] Supabase overlay fallback: {e}")
+            print(f"  [Overlay Loader Note] Database overlay skipped: {e}")
 
-    # Fallback to local csv
-    arm_path = resolve_file('arm_table.csv', ['*arm_table*.csv', '*arm_table*.xlsx'])
-    trt_path = resolve_file('treatment_table.csv', ['*treatment_table*.csv', '*treatment_table*.xlsx'])
-
-    if not arm_path or not os.path.exists(arm_path):
-        print("  WARNING: arm_table.csv not found for overlay.")
-        return pd.DataFrame(columns=['Sample_ID', 'Position', 'Arm_Code', 'Drug'])
-
-    arm = rcsv(arm_path) if arm_path.endswith('.csv') else rxlsx(arm_path)
-    trt = (rcsv(trt_path) if trt_path.endswith('.csv') else rxlsx(trt_path)) if trt_path else pd.DataFrame()
-
-    pos_cols = arm_position_cols(arm)
+    # 2. Extract verified arms directly from multi-omics assay datasets
     rows = []
-    for _, ar in arm.iterrows():
-        sid = ar.get('Sample_ID', '').strip()
-        if not sid:
-            continue
-        tr  = trt[trt['Sample_ID'] == sid] if not trt.empty and 'Sample_ID' in trt.columns else pd.DataFrame()
-        for pos in pos_cols:
-            code = str(ar.get(pos, '')).strip()
-            if not code or code.lower() in ('nan', 'none'):
-                continue
-            drug = ''
-            if not tr.empty and pos in tr.columns:
-                drug = str(tr.iloc[0][pos]).strip()
-                if drug.lower() in ('nan', 'none'):
-                    drug = ''
-            rows.append({'Sample_ID': sid, 'Position': pos,
-                         'Arm_Code': code.upper(), 'Drug': drug})
-    return (pd.DataFrame(rows) if rows
-            else pd.DataFrame(columns=['Sample_ID', 'Position', 'Arm_Code', 'Drug']))
+    seen = set()
+    if assay_dfs:
+        for aname, df in assay_dfs.items():
+            sid_col = find_col(df, SID_ALIASES)
+            arm_col = find_col(df, ARM_ALIASES)
+            if sid_col and arm_col and sid_col in df.columns and arm_col in df.columns:
+                for _, r in df[[sid_col, arm_col]].dropna().iterrows():
+                    sid = str(r[sid_col]).strip()
+                    arm = str(r[arm_col]).strip().upper()
+                    if sid and arm and (sid, arm) not in seen and arm.lower() not in ('nan', 'none', ''):
+                        seen.add((sid, arm))
+                        rows.append({'Sample_ID': sid, 'Position': '', 'Arm_Code': arm, 'Drug': ''})
+
+    if rows:
+        return pd.DataFrame(rows)
+    return pd.DataFrame(columns=['Sample_ID', 'Position', 'Arm_Code', 'Drug'])
+
 
 
 def load_assay_dfs(assay_paths: dict = None) -> dict:

@@ -134,15 +134,17 @@ def run_migration():
     except Exception as e:
         print(f"  [ERROR] Failed migrating metadata: {e}")
 
-    # Overlay Table
+    # Overlay Table (Derived directly from verified Assay tables)
     print("\n  Migrating [OVERLAY] -> Supabase table 'overlay'...")
     try:
-        from data_loader import build_overlay
-        overlay_df = build_overlay()
+        from data_loader import build_overlay, load_assay_dfs
+        a_dfs = load_assay_dfs()
+        overlay_df = build_overlay(a_dfs)
         if not overlay_df.empty:
             push_dataframe(overlay_df, "overlay", engine)
     except Exception as e:
         print(f"  [ERROR] Failed migrating overlay: {e}")
+
 
 
     # ── 4. Verify Final Supabase Cloud Tables ────────────────────────────────

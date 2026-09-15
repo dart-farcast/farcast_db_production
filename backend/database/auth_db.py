@@ -26,30 +26,6 @@ def verify_password(password: str, stored_hash: str) -> bool:
     except Exception:
         return False
 
-def validate_password_strength(password: str) -> tuple[bool, str]:
-    """
-    Validates password against security baseline:
-    - Minimum 8 characters, maximum 128 characters
-    - Must contain at least one uppercase letter, one lowercase letter, and one digit
-    - Rejects common trivial passwords
-    """
-    if not password or len(password) < 8:
-        return False, "Password must be at least 8 characters long."
-    if len(password) > 128:
-        return False, "Password cannot exceed 128 characters."
-    if not any(c.isupper() for c in password):
-        return False, "Password must contain at least one uppercase letter."
-    if not any(c.islower() for c in password):
-        return False, "Password must contain at least one lowercase letter."
-    if not any(c.isdigit() for c in password):
-        return False, "Password must contain at least one numeric digit."
-    
-    common_weak = {"password", "password123", "admin1234", "qwerty123", "letmein123", "farcast123"}
-    if password.lower() in common_weak:
-        return False, "Password is too common or easily guessable. Please choose a stronger password."
-
-    return True, ""
-
 def is_email_whitelisted(email: str) -> bool:
     """Checks if an email matches a whitelisted email or domain pattern."""
     email_clean = email.strip().lower()
@@ -102,27 +78,10 @@ def init_auth_db():
                 actor_email TEXT,
                 action TEXT NOT NULL,
                 details TEXT,
-                request_id TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-
-        # Token blacklist table (Revoked JWTs)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS token_blacklist (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                jti TEXT UNIQUE NOT NULL,
-                revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP
-            )
-        """)
         db.commit()
-
-        # Populate in-memory blacklist cache on init
-        cursor.execute("SELECT jti FROM token_blacklist")
-        for r in cursor.fetchall():
-            if r.get('jti'):
-                _REVOKED_JTIS.add(r['jti'])
 
         # Seed default whitelist rules if empty
         cursor.execute("SELECT COUNT(*) as cnt FROM whitelisted_emails")
@@ -147,35 +106,13 @@ def init_auth_db():
             print("  [Auth DB] Initialized auth database with default admin: admin@farcastbio.com / admin123")
 
 
-_REVOKED_JTIS: set[str] = set()
-
-def revoke_token(jti: str, expires_at: Optional[str] = None):
-    """Adds a JWT token identifier (jti) to the revocation blacklist and memory set."""
-    if not jti:
-        return
-    _REVOKED_JTIS.add(jti)
+def log_audit_event(actor_email: str, action: str, details: str):
+    """Records security audit log entry."""
     try:
         with get_db_connection() as db:
             cursor = db.cursor()
-            cursor.execute("INSERT INTO token_blacklist (jti, expires_at) VALUES (?, ?)", (jti, expires_at))
+            cursor.execute("INSERT INTO audit_logs (actor_email, action, details) VALUES (?, ?, ?)",
+                           (actor_email, action, details))
             db.commit()
     except Exception:
         pass
-
-def is_token_revoked(jti: str) -> bool:
-    """Checks if a JWT jti exists in the revocation blacklist (0ms memory check)."""
-    if not jti:
-        return False
-    return jti in _REVOKED_JTIS
-
-def log_audit_event(actor_email: str, action: str, details: str, request_id: Optional[str] = None):
-    """Records security audit log entry with optional request correlation ID."""
-    try:
-        with get_db_connection() as db:
-            cursor = db.cursor()
-            cursor.execute("INSERT INTO audit_logs (actor_email, action, details, request_id) VALUES (?, ?, ?, ?)",
-                           (actor_email, action, details, request_id or ""))
-            db.commit()
-    except Exception:
-        pass
-

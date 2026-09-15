@@ -1,58 +1,29 @@
 import os, re
-from fastapi import APIRouter, UploadFile, Form, Depends, HTTPException, status
-from ..cache import cache, reload_cache
-from ..auth import get_current_admin_user
-from database.data_loader import rcsv, DATA_DIR
+from fastapi import APIRouter, UploadFile, Form
+from ..cache import cache
+from database.data_loader import rcsv, DATA_DIR, load_assay_dfs, build_assay_presence_map, compute_stats, build_indexes
+def discover_assays(): return {}
 
 router = APIRouter()
 
-MAX_UPLOAD_SIZE = 25 * 1024 * 1024  # 25 MB max
+
 
 @router.post('/upload')
-async def upload(
-    table: str = Form(...),
-    file: UploadFile = None,
-    current_admin: dict = Depends(get_current_admin_user)
-):
+async def upload(table: str = Form(...), file: UploadFile = None):
     if not file or not table:
-        raise HTTPException(status_code=400, detail="Missing file or table name.")
-
-    # Validate table name pattern
-    table_clean = table.strip()
-    if not re.match(r'^[a-zA-Z0-9_\-]+$', table_clean):
-        raise HTTPException(status_code=400, detail="Invalid table name. Only alphanumeric, dashes, and underscores allowed.")
-
-    # Validate filename extension
-    if not file.filename.lower().endswith(('.csv', '.tsv')):
-        raise HTTPException(status_code=400, detail="Only CSV/TSV data files are supported.")
-
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024*1024)}MB.")
-
-    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', table_clean.lower()) + '.csv'
+        return {'error': 'Missing file or table name'}
+    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', table.lower()) + '.csv'
     path = os.path.join(DATA_DIR, safe)
-    
-    os.makedirs(DATA_DIR, exist_ok=True)
+    content = await file.read()
     with open(path, 'wb') as f:
         f.write(content)
-
     try:
         df = rcsv(path)
-        if df.empty:
-            raise ValueError("Uploaded file contains no rows.")
-        # Reload cache safely
-        reload_cache()
-        return {
-            'success': True,
-            'ok': True,
-            'rows': len(df),
-            'cols': list(df.columns),
-            'file': safe
-        }
+        # Reload assay data into cache
+        cache.assay_paths    = discover_assays()
+        cache.assay_dfs      = load_assay_dfs(cache.assay_paths)
+        cache.assay_presence = build_assay_presence_map(cache.assay_dfs)
+        cache.stats          = compute_stats(cache.metadata, cache.overlay, cache.assay_dfs)
+        return {'ok': True, 'rows': len(df), 'cols': list(df.columns), 'file': safe}
     except Exception as e:
-        if os.path.exists(path):
-            try: os.remove(path)
-            except Exception: pass
-        raise HTTPException(status_code=400, detail=f"Failed to process dataset: {str(e)}")
-
+        return {'error': str(e)}

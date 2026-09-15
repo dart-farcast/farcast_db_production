@@ -31,7 +31,7 @@ def test_full_auth_flow():
         print("\n--- 3. Testing Non-Whitelisted User Registration ---")
         res = client.post("/api/auth/register", json={
             "email": unwhitelisted_email,
-            "password": "GuestPassword#123",
+            "password": "guestpassword123",
             "full_name": "Dr. Guest"
         })
         assert res.status_code == 200, f"Registration failed: {res.text}"
@@ -48,7 +48,7 @@ def test_full_auth_flow():
         print("\n--- 5. Testing Domain-Based Auto-Whitelisting Registration ---")
         res = client.post("/api/auth/register", json={
             "email": domain_email,
-            "password": "CompanyPassword#123",
+            "password": "sciencestudio",
             "full_name": "FarCast Scientist"
         })
         assert res.status_code == 200, f"Domain registration failed: {res.text}"
@@ -70,9 +70,8 @@ def test_full_auth_flow():
         print("[OK] Admin successfully whitelisted guest email.")
 
         print("\n--- 8. Testing Previously Pending User Access After Admin Whitelist ---")
-        res = client.post("/api/auth/login", json={"email": unwhitelisted_email, "password": "GuestPassword#123"})
+        res = client.post("/api/auth/login", json={"email": unwhitelisted_email, "password": "guestpassword123"})
         assert res.status_code == 200, f"Re-login failed: {res.text}"
-
         new_guest_token = res.json()["token"]
         assert res.json()["user"]["is_whitelisted"] == True
 

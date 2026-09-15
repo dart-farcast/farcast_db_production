@@ -10,8 +10,7 @@ def test_study_access_control():
     with TestClient(app) as client:
         ts = int(time.time())
         restricted_email = f"study_user_{ts}@external.org"
-        password = "ScopedPassword#123"
-
+        password = "password123"
 
         print("\n--- 1. Login as Default Admin ---")
         res = client.post("/api/auth/login", json={"email": "admin@farcastbio.com", "password": "admin123"})
