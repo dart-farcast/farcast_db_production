@@ -126,9 +126,11 @@ def is_sample_qualified(val) -> bool:
 def load_metadata() -> pd.DataFrame:
     db_url = os.environ.get('DATABASE_URL', '').strip()
     if db_url:
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
         try:
             from sqlalchemy import create_engine, inspect
-            engine = create_engine(db_url, connect_args={'connect_timeout': 5})
+            engine = create_engine(db_url, connect_args={'connect_timeout': 15})
             insp = inspect(engine)
             if insp.has_table('metadata'):
                 df = pd.read_sql_table('metadata', engine)
@@ -177,9 +179,11 @@ def resolve_file(filename, fallback_patterns):
 def build_overlay() -> pd.DataFrame:
     db_url = os.environ.get('DATABASE_URL', '').strip()
     if db_url:
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
         try:
             from sqlalchemy import create_engine, inspect
-            engine = create_engine(db_url, connect_args={'connect_timeout': 5})
+            engine = create_engine(db_url, connect_args={'connect_timeout': 15})
             insp = inspect(engine)
             if insp.has_table('overlay'):
                 df = pd.read_sql_table('overlay', engine)
