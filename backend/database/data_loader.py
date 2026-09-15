@@ -114,6 +114,20 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
         df[c] = df[c].str.strip()
     return df.fillna('')
 
+def clean_drug_value(d, arm_code='') -> str:
+    """Filter out unmapped arm codes (RXA, RXB, ARM1) and remarks/notes from drug values."""
+    if not d or pd.isna(d):
+        return ''
+    d_clean = str(d).strip()
+    d_upper = d_clean.upper()
+    if any(phrase in d_upper for phrase in [
+        'NOT MENTIONED', 'MISSED DETAILS', 'INSERT STUDY', 'TX RECEIVED WITH', 'DRUG DETAILS'
+    ]):
+        return ''
+    if d_upper.startswith('ARM') or d_upper.startswith('RX'):
+        return ''
+    return d_clean
+
 def is_sample_qualified(val) -> bool:
     """Determine if sample is qualified based on Final Qualification column."""
     if not val or pd.isna(val):
@@ -189,11 +203,21 @@ def build_overlay() -> pd.DataFrame:
                 df = pd.read_sql_table('overlay', engine)
                 if not df.empty and 'Sample_ID' in df.columns:
                     print(f"  Successfully loaded {len(df)} overlay rows from Supabase Cloud.")
-                    return clean_df(df)
+                    df = clean_df(df)
+                    if 'Drug' in df.columns:
+                        df['Drug'] = df['Drug'].apply(clean_drug_value)
+                    return df
         except Exception as e:
             print(f"  [Overlay Loader Note] Supabase overlay fallback: {e}")
 
     # Fallback to local csv
+    overlay_path = resolve_file('overlay_table.csv', ['*overlay*.csv'])
+    if overlay_path and os.path.exists(overlay_path):
+        df = rcsv(overlay_path)
+        if 'Drug' in df.columns:
+            df['Drug'] = df['Drug'].apply(clean_drug_value)
+        return clean_df(df)
+
     arm_path = resolve_file('arm_table.csv', ['*arm_table*.csv', '*arm_table*.xlsx'])
     trt_path = resolve_file('treatment_table.csv', ['*treatment_table*.csv', '*treatment_table*.xlsx'])
 
@@ -220,6 +244,7 @@ def build_overlay() -> pd.DataFrame:
                 drug = str(tr.iloc[0][pos]).strip()
                 if drug.lower() in ('nan', 'none'):
                     drug = ''
+            drug = clean_drug_value(drug, code)
             rows.append({'Sample_ID': sid, 'Position': pos,
                          'Arm_Code': code.upper(), 'Drug': drug})
     return (pd.DataFrame(rows) if rows
