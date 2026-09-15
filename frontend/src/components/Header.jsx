@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import FarcastLogo from './FarcastLogo'
+import AssayDetailsModal from './AssayDetailsModal'
 
 /**
  * Maps each panel id → the store filter field to add the clicked value into.
@@ -106,6 +107,7 @@ export default function Header() {
   const { user, currentView, setCurrentView, logout } = useStore()
   const stats = useStore(s => s.stats)
   const [openPanel, setOpenPanel] = useState(null)
+  const [showAssayGuide, setShowAssayGuide] = useState(false)
 
   const toggle = (id) => setOpenPanel(p => (p === id ? null : id))
   const assayCount = Object.keys(stats?.assay_samples || {}).length
@@ -145,6 +147,14 @@ export default function Header() {
 
       {user && (
         <div className="header-user-actions">
+          <button 
+            className="header-nav-btn assay-guide-btn" 
+            onClick={() => setShowAssayGuide(true)}
+            title="View Assay Details & Readout Descriptions"
+          >
+            🔬 Assay Details
+          </button>
+
           {user.role === 'admin' && (
             <button 
               className={`header-nav-btn ${currentView === 'admin' ? 'active' : ''}`}
@@ -167,6 +177,10 @@ export default function Header() {
           </button>
         </div>
       )}
+
+      {/* Assay Details Modal */}
+      <AssayDetailsModal isOpen={showAssayGuide} onClose={() => setShowAssayGuide(false)} />
     </header>
   )
 }
+

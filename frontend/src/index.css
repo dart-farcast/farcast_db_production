@@ -1565,3 +1565,302 @@ input:checked + .slider:before {
 .switch-sm input:checked + .slider:before {
   transform: translateX(14px);
 }
+
+/* ── Assay Details & Parameter Guide Modal ─────────────────────────────── */
+.assay-guide-btn {
+  background: linear-gradient(135deg, rgba(142, 36, 170, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%) !important;
+  color: var(--farcast-purple) !important;
+  border-color: rgba(142, 36, 170, 0.3) !important;
+  font-weight: 600 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+.assay-guide-btn:hover {
+  background: linear-gradient(135deg, rgba(142, 36, 170, 0.18) 0%, rgba(59, 130, 246, 0.18)) !important;
+  border-color: var(--farcast-purple) !important;
+  transform: translateY(-1px);
+}
+
+.assay-details-modal-card {
+  max-width: 980px !important;
+  max-height: 90vh !important;
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+}
+
+.assay-modal-header {
+  padding: 16px 22px !important;
+  background: #F8FAFC !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+.assay-modal-icon {
+  font-size: 24px;
+  background: rgba(142, 36, 170, 0.1);
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(142, 36, 170, 0.2);
+}
+
+.assay-modal-toolbar {
+  padding: 14px 22px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assay-modal-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 8px 14px;
+  transition: border-color 0.2s ease;
+}
+.assay-modal-search:focus-within {
+  border-color: var(--farcast-purple);
+  box-shadow: 0 0 0 3px rgba(142, 36, 170, 0.1);
+}
+.assay-modal-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #0F172A;
+  width: 100%;
+}
+.clear-search-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+}
+.clear-search-btn:hover {
+  color: #0F172A;
+}
+
+.assay-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assay-tab-btn {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.assay-tab-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
+.assay-tab-btn.active {
+  background: var(--farcast-purple);
+  color: #FFFFFF;
+  border-color: var(--farcast-purple);
+  font-weight: 600;
+}
+
+.assay-modal-body {
+  padding: 20px 22px !important;
+  overflow-y: auto !important;
+  max-height: calc(90vh - 220px) !important;
+  background: #F8FAFC !important;
+}
+
+.assay-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.assay-detail-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.adc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.adc-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adc-badge {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  width: fit-content;
+}
+
+.adc-file {
+  font-size: 11.5px;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+.adc-file-label {
+  font-weight: 600;
+  color: #475569;
+}
+.adc-file code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #0F172A;
+}
+
+.adc-desc {
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.45;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.adc-subtypes-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adc-subtype-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1E293B;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.adc-subtype-title::before {
+  content: "•";
+  color: var(--farcast-purple);
+  font-size: 16px;
+}
+
+.adc-param-table-wrap {
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.adc-param-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.adc-param-table th {
+  background: #F8FAFC;
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #64748B;
+  border-bottom: 1px solid #E2E8F0;
+}
+.adc-param-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+.adc-param-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.adc-param-table tbody tr:hover {
+  background: #F8FAFC;
+}
+
+.param-name-cell {
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.param-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #0F172A;
+}
+
+.param-desc-cell {
+  color: #475569;
+  line-height: 1.35;
+}
+
+.param-highlighted {
+  background: rgba(245, 158, 11, 0.08) !important;
+}
+.param-highlighted .param-tag {
+  background: #FEF3C7;
+  border-color: #FCD34D;
+  color: #92400E;
+}
+
+.assay-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.assay-modal-footer {
+  padding: 12px 22px !important;
+  background: #F8FAFC !important;
+  border-top: 1px solid #E2E8F0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
