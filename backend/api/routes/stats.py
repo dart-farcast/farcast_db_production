@@ -15,7 +15,7 @@ def stats(current_user: dict = Depends(get_current_whitelisted_user)):
         return cache.stats
 
     # Scope stats dynamically for restricted user
-    study_col = 'Study' if 'Study' in cache.metadata.columns else None
+    study_col = 'Study' if 'Study' in cache.metadata.columns else ('RegisterType' if 'RegisterType' in cache.metadata.columns else None)
     if not study_col or not isinstance(allowed_studies, list):
         return cache.stats
 
@@ -25,36 +25,16 @@ def stats(current_user: dict = Depends(get_current_whitelisted_user)):
     
     if meta_scoped.empty:
         return {
-            'samples': 0, 'drugs': 0, 'assay_samples': {},
+            'samples': 0, 'qualified_samples': 0, 'disqualified_samples': 0,
+            'internal_rd_total': 0, 'internal_rd_qualified': 0,
+            'biopharma_total': 0, 'biopharma_qualified': 0,
+            'drugs': 0, 'assay_samples': {},
             'studies': 0, 'indications': {}, 'top_drugs': [], 'study_list': allowed_studies
         }
 
     scoped_sids = set(meta_scoped['Sample_ID'])
     overlay_scoped = cache.overlay[cache.overlay['Sample_ID'].isin(scoped_sids)]
-    
-    a_samples = {}
-    for name, df in cache.assay_dfs.items():
-        sid_col = find_col(df, SID_ALIASES)
-        if sid_col and sid_col in df.columns:
-            cnt = df[df[sid_col].isin(scoped_sids)][sid_col].nunique()
-            a_samples[name] = int(cnt)
-        else:
-            a_samples[name] = 0
-
-    drugs = overlay_scoped['Drug'].replace('', pd.NA).dropna()
-    indications = (meta_scoped['CancerType'].replace('', pd.NA).dropna().value_counts().to_dict()
-                   if 'CancerType' in meta_scoped.columns else {})
-    study_list = sorted(meta_scoped[study_col].replace('', pd.NA).dropna().unique().tolist())
-
-    return {
-        'samples':       int(meta_scoped['Sample_ID'].nunique()),
-        'drugs':         int(drugs.nunique()),
-        'assay_samples': a_samples,
-        'studies':       int(meta_scoped[study_col].nunique()),
-        'indications':   indications,
-        'top_drugs':     drugs.value_counts().head(20).index.tolist(),
-        'study_list':    study_list,
-    }
+    return compute_stats(meta_scoped, overlay_scoped, cache.assay_dfs)
 
 
 

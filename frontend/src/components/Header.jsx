@@ -46,16 +46,25 @@ function StatPanel({ id, stats, onClose }) {
     }))
 
   } else if (id === 'studies') {
-    title = 'Studies'
+    title = 'Study Types'
     rows = (stats.study_list || []).map(s => ({ label: s, val: null, clickValue: s }))
+  } else if (id === 'qualification') {
+    title = 'Qualification Breakdown'
+    rows = [
+      { label: 'Qualified Samples', val: stats.qualified_samples ?? 0, clickValue: null },
+      { label: 'Disqualified Samples', val: stats.disqualified_samples ?? 0, clickValue: null },
+      { label: 'Internal R&D Qualified', val: `${stats.internal_rd_qualified ?? 0} / ${stats.internal_rd_total ?? 0}`, clickValue: 'R&D' },
+      { label: 'BioPharma Qualified', val: `${stats.biopharma_qualified ?? 0} / ${stats.biopharma_total ?? 0}`, clickValue: 'Biopharma' },
+    ]
   }
 
   const field       = PANEL_FIELD[id]
   const activeField = Array.isArray(filters[field]) ? filters[field] : []
 
   const handleRowClick = (clickValue) => {
+    if (!clickValue) return
     onClose()
-    setFilterAndSearch(field, clickValue)
+    setFilterAndSearch(field || 'study', clickValue)
   }
 
   return (
@@ -68,26 +77,27 @@ function StatPanel({ id, stats, onClose }) {
           </div>
         )}
         {rows.map((r, i) => {
-          const isActive = activeField.includes(r.clickValue)
+          const isActive = r.clickValue && activeField.includes(r.clickValue)
+          const isClickable = Boolean(r.clickValue)
           return (
             <div
               key={i}
-              className={`sp-row clickable${isActive ? ' sp-active' : ''}`}
-              onClick={() => handleRowClick(r.clickValue)}
-              title={`Filter by "${r.clickValue}"`}
+              className={`sp-row${isClickable ? ' clickable' : ''}${isActive ? ' sp-active' : ''}`}
+              onClick={() => isClickable && handleRowClick(r.clickValue)}
+              title={isClickable ? `Filter by "${r.clickValue}"` : ''}
             >
               <span className="sp-label">{r.label}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {r.val !== null && <span className="sp-val">{r.val}</span>}
-                {isActive
+                {isClickable && (isActive
                   ? <span className="sp-check">✓</span>
-                  : <span className="sp-plus">+</span>}
+                  : <span className="sp-plus">+</span>)}
               </div>
             </div>
           )
         })}
       </div>
-      <div className="sp-footer">Click a row to filter &amp; search</div>
+      <div className="sp-footer">{id === 'qualification' ? 'Sample Qualification Overview' : 'Click a row to filter & search'}</div>
     </div>
   )
 }
@@ -101,10 +111,11 @@ export default function Header() {
   const assayCount = Object.keys(stats?.assay_samples || {}).length
 
   const badges = stats ? [
-    { id: 'samples',    num: stats.samples ?? '—',  label: 'Samples'     },
-    { id: 'drugs',      num: stats.drugs   ?? '—',  label: 'Drugs'       },
-    { id: 'assayTypes', num: assayCount,             label: 'Assay Types' },
-    { id: 'studies',    num: stats.studies ?? '—',  label: 'Studies'     },
+    { id: 'samples',       num: stats.samples ?? '—',            label: 'Samples'     },
+    { id: 'qualification', num: stats.qualified_samples ?? '—',  label: 'Qualified'   },
+    { id: 'drugs',         num: stats.drugs   ?? '—',            label: 'Drugs'       },
+    { id: 'assayTypes',    num: assayCount,                       label: 'Assay Types' },
+    { id: 'studies',       num: stats.studies ?? '—',            label: 'Study Types' },
   ] : []
 
   return (

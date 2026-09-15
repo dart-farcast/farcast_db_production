@@ -125,12 +125,30 @@ def run_migration():
     migrate_assay_file("mIHC", "mIHC image details With Treatment Details_SS 1.xlsx", "assay_mihc", engine)
 
     # Metadata Table
-    print("\n  Migrating [METADATA] -> Supabase table 'metadata'...")
+    print("\n  Migrating [METADATA] (July 2026 Cohort) -> Supabase table 'metadata'...")
     try:
-        from data_loader import load_metadata, build_overlay
-        meta_df = load_metadata()
-        if not meta_df.empty:
-            push_dataframe(meta_df, "metadata", engine)
+        from data_loader import COHORT_FILE, COHORT_SHEET, COHORT_COL_MAP, clean_df
+        print(f"  Reading metadata from {COHORT_FILE} [{COHORT_SHEET}]...")
+        raw_meta = pd.read_excel(COHORT_FILE, sheet_name=COHORT_SHEET, dtype=str)
+        # Drop empty trailing rows
+        if 'Register' in raw_meta.columns:
+            raw_meta = raw_meta.dropna(subset=['Register'])
+        elif 'Sample_ID' in raw_meta.columns:
+            raw_meta = raw_meta.dropna(subset=['Sample_ID'])
+        for c in raw_meta.select_dtypes('object').columns:
+            raw_meta[c] = raw_meta[c].str.strip()
+        renames = {k: v for k, v in COHORT_COL_MAP.items() if k in raw_meta.columns}
+        meta_df = raw_meta.rename(columns=renames)
+        meta_df = meta_df.loc[:, ~meta_df.columns.str.startswith('Unnamed:')]
+        if 'Sample_ID' in meta_df.columns:
+            meta_df = meta_df[meta_df['Sample_ID'].str.strip().ne('')]
+            meta_df = meta_df.drop_duplicates(subset=['Sample_ID'], keep='first')
+        if 'Study' in meta_df.columns and 'RegisterType' not in meta_df.columns:
+            meta_df['RegisterType'] = meta_df['Study']
+        meta_df = clean_df(meta_df)
+
+        print(f"  Pushing {len(meta_df)} clean unique metadata records to Supabase...")
+        push_dataframe(meta_df, "metadata", engine)
     except Exception as e:
         print(f"  [ERROR] Failed migrating metadata: {e}")
 

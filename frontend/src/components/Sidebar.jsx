@@ -20,7 +20,7 @@ export default function Sidebar({ onSearch }) {
 
   return (
     <aside>
-      {/* ── Qualification Status Toggle ────────────────────────────────── */}
+      {/* ── Qualification Status Toggle & Metrics ──────────────────────── */}
       <div className="sb-section qual-toggle-section">
         <div className="qual-toggle-card">
           <div className="qual-toggle-text">
@@ -30,12 +30,42 @@ export default function Sidebar({ onSearch }) {
           <label className="switch">
             <input
               type="checkbox"
-              checked={filters.qualified_only}
-              onChange={e => setFilter('qualified_only', e.target.checked)}
+              checked={Boolean(filters.qualified_only)}
+              onChange={e => {
+                setFilter('qualified_only', e.target.checked)
+                setTimeout(() => onSearch(), 50)
+              }}
             />
             <span className="slider round"></span>
           </label>
         </div>
+
+        {stats && (
+          <div className="qual-stats-grid">
+            <div className="qual-stat-pill qual-green">
+              <span className="qs-label">Qualified</span>
+              <span className="qs-val">{stats.qualified_samples?.toLocaleString() ?? '—'}</span>
+            </div>
+            <div className="qual-stat-pill qual-red">
+              <span className="qs-label">Disqualified</span>
+              <span className="qs-val">{stats.disqualified_samples?.toLocaleString() ?? '—'}</span>
+            </div>
+            <div className="qual-stat-pill qual-blue">
+              <span className="qs-label">Internal R&D</span>
+              <span className="qs-val">
+                <b>{stats.internal_rd_qualified?.toLocaleString() ?? '—'}</b>
+                <span className="qs-sub"> / {stats.internal_rd_total?.toLocaleString() ?? '—'}</span>
+              </span>
+            </div>
+            <div className="qual-stat-pill qual-purple">
+              <span className="qs-label">BioPharma</span>
+              <span className="qs-val">
+                <b>{stats.biopharma_qualified?.toLocaleString() ?? '—'}</b>
+                <span className="qs-sub"> / {stats.biopharma_total?.toLocaleString() ?? '—'}</span>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Search filters ─────────────────────────────────────────── */}

@@ -9,8 +9,8 @@ import pandas as pd
 _HERE        = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR     = os.path.normpath(os.path.join(_HERE, '..', '..', 'data'))
 COHORT_DIR   = os.path.join(DATA_DIR, 'latest cohort data')
-COHORT_FILE  = os.path.join(COHORT_DIR, 'Farcast Tissue sample 2020 to 2025.xlsx')
-COHORT_SHEET = 'All Data'
+COHORT_FILE  = os.path.join(COHORT_DIR, 'All sample details_Till July 2026_Satish (1).xlsx')
+COHORT_SHEET = 'All Sample 2020 to till Jun2026'
 CORE_FILES   = {'arm_table.csv', 'treatment_table.csv', 'metadata_table.csv'}
 SID_ALIASES  = ['sample_id', 'sampleid', 'sample id', 'register']
 ARM_ALIASES  = ['arms', 'arm', 'arm_code', 'treatment arms']
@@ -18,12 +18,13 @@ ARM_ALIASES  = ['arms', 'arm', 'arm_code', 'treatment arms']
 COHORT_COL_MAP = {
     'Register':                            'Sample_ID',
     'CASE No':                             'CaseNo',
-    'Register Type':                       'RegisterType',
+    'Register Type':                       'Study',             # Mapped to Study Type
     'Sample Collection Date':              'CollectionDate',
+    'Sample Collection Date\n(dd-mm-yyyy)': 'CollectionDate',
     'Protocol':                            'Protocol',
     'Patient ID':                          'PatientID',
-    'Project':                             'Project_ID',
-    'Primary study':                       'Study',
+    'Project':                             'Project_ID',        # Study Code
+    'Primary study':                       'PrimaryStudy',
     'Tissue Qualification':                'TissueQualification',
     'Blood Qualification':                 'BloodQualification',
     'Baseline Qualification':              'BaselineQualification',
@@ -41,6 +42,7 @@ COHORT_COL_MAP = {
     'Gender':                              'Gender',
     'Age':                                 'Age',
     'Infection Status':                    'InfectionStatus',
+    'Temp':                                'Temperature',
     'Temprature':                          'Temperature',
     'Logistic':                            'Logistic',
     'Procedure Type':                      'ProcedureType',
@@ -48,9 +50,10 @@ COHORT_COL_MAP = {
     'Therapy':                             'Therapy',
     'cTNM':                                'cTNM',
     'Cancer Stage':                        'CancerStage',
+    'Cancer Stage-1':                      'CancerStage',
     'Cancer Grade':                        'CancerGrade',
     'pTNM':                                'pTNM',
-    'Treatment Arms':                      'TreatmentArms',
+    'Treatment Cycles':                    'TreatmentCycles',
     'Drug Name':                           'DrugName',
     'Histopath':                           'Histopath',
     'Post Surgery Treatment Arms':         'PostSurgeryTreatmentArms',
@@ -62,6 +65,7 @@ COHORT_COL_MAP = {
     'Room #':                              'RoomNumber',
     'Processed By':                        'ProcessedBy',
     'Blood qualified (Y/N)':               'BloodQualifiedYN',
+    'Autologus Plasma Addition (Y/N)':     'AutologusPlasmaAddition',
     'Autologus Serum Addition (Y/N)':      'AutologusSerumAddition',
     'Co-culture':                          'CoCulture',
     'Q2 Qualification':                    'Q2Qualification',
@@ -69,7 +73,11 @@ COHORT_COL_MAP = {
     'T0 - M/V T0(Arm x Replicates)':      'T0_MV',
     'Culture - M/V Tx (Arm x Replicates)': 'Culture_MVTx',
     'Total # of explants':                 'TotalExplants',
-    'Column1':                             'Column1',
+    'Q2.5 Qualifiction':                   'Q2_5_Qualification',
+    'Q3 Qualification based on Pathology (>10% tumor content of 5 out of 7 at T0 and all arms of T72) (By Ritu)': 'Q3_Qualification',
+    'Q4 Qualification':                    'Q4_Qualification',
+    'Final Qualification.1':               'FinalQualification_Consolidated',
+    'Remarks':                             'Remarks',
 }
 
 def rcsv(path: str) -> pd.DataFrame:
@@ -106,6 +114,15 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
         df[c] = df[c].str.strip()
     return df.fillna('')
 
+def is_sample_qualified(val) -> bool:
+    """Determine if sample is qualified based on Final Qualification column."""
+    if not val or pd.isna(val):
+        return False
+    v = str(val).strip().lower()
+    if any(rej in v for rej in ('reject', 'compromised', 'contaminat', 'terminated', 'invalid', 'low tumor')):
+        return False
+    return v == 'qualified' or 'passed' in v
+
 def load_metadata() -> pd.DataFrame:
     db_url = os.environ.get('DATABASE_URL', '').strip()
     if db_url:
@@ -117,19 +134,32 @@ def load_metadata() -> pd.DataFrame:
                 df = pd.read_sql_table('metadata', engine)
                 if not df.empty and 'Sample_ID' in df.columns:
                     print(f"  Successfully loaded {len(df)} metadata rows from Supabase Cloud.")
-                    return clean_df(df)
+                    df = clean_df(df)
+                    if 'Study' in df.columns and 'RegisterType' not in df.columns:
+                        df['RegisterType'] = df['Study']
+                    return df
         except Exception as e:
             print(f"  [Metadata Loader Note] Supabase metadata fallback: {e}")
 
     # Fallback to local excel
     if os.path.exists(COHORT_FILE):
-        df = rxlsx(COHORT_FILE, sheet=COHORT_SHEET)
+        df = pd.read_excel(COHORT_FILE, sheet_name=COHORT_SHEET, dtype=str)
+        # Drop empty trailing rows
+        if 'Register' in df.columns:
+            df = df.dropna(subset=['Register'])
+        elif 'Sample_ID' in df.columns:
+            df = df.dropna(subset=['Sample_ID'])
+        for c in df.select_dtypes('object').columns:
+            df[c] = df[c].str.strip()
         renames = {k: v for k, v in COHORT_COL_MAP.items() if k in df.columns}
         df = df.rename(columns=renames)
         df = df.loc[:, ~df.columns.str.startswith('Unnamed:')]
         if 'Sample_ID' in df.columns:
             df = df[df['Sample_ID'].str.strip().ne('')]
-        return df
+            df = df.drop_duplicates(subset=['Sample_ID'], keep='first')
+        if 'Study' in df.columns and 'RegisterType' not in df.columns:
+            df['RegisterType'] = df['Study']
+        return df.fillna('')
     return pd.DataFrame()
 
 def resolve_file(filename, fallback_patterns):
@@ -282,8 +312,8 @@ def build_assay_presence_map(assay_dfs: dict) -> dict:
     return presence
 
 def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict) -> dict:
-    drugs     = overlay['Drug'].replace('', pd.NA).dropna()
-    study_col = 'Study' if 'Study' in meta.columns else None
+    drugs     = overlay['Drug'].replace('', pd.NA).dropna() if not overlay.empty and 'Drug' in overlay.columns else pd.Series(dtype=object)
+    study_col = 'Study' if 'Study' in meta.columns else ('RegisterType' if 'RegisterType' in meta.columns else None)
     indications = (meta['CancerType'].replace('', pd.NA).dropna().value_counts().to_dict()
                    if 'CancerType' in meta.columns else {})
     study_list = (sorted(meta[study_col].replace('', pd.NA).dropna().unique().tolist())
@@ -291,15 +321,45 @@ def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict) ->
     a_samples = {}
     for name, df in assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
-        a_samples[name] = int(df[sid_col].replace('', pd.NA).dropna().nunique()) if sid_col else 0
+        a_samples[name] = int(df[sid_col].replace('', pd.NA).dropna().nunique()) if sid_col and sid_col in df.columns else 0
+
+    total_samples = int(meta['Sample_ID'].nunique()) if not meta.empty and 'Sample_ID' in meta.columns else 0
+
+    # Qualification Breakdown
+    qual_col = next((c for c in ['FinalQualification', 'Final Qualification', 'Final_Qualification'] if c in meta.columns), None)
+    if qual_col and not meta.empty:
+        is_qual_mask = meta[qual_col].apply(is_sample_qualified)
+        qualified_samples = int(meta[is_qual_mask]['Sample_ID'].nunique())
+    else:
+        is_qual_mask = pd.Series(True, index=meta.index) if not meta.empty else pd.Series(dtype=bool)
+        qualified_samples = total_samples
+
+    disqualified_samples = max(0, total_samples - qualified_samples)
+
+    # R&D vs BioPharma stats
+    rd_mask = meta[study_col].astype(str).str.strip().str.lower().isin(['r&d', 'internal r&d']) if study_col and not meta.empty else pd.Series(False, index=meta.index)
+    bio_mask = meta[study_col].astype(str).str.strip().str.lower().isin(['biopharma', 'bio pharma']) if study_col and not meta.empty else pd.Series(False, index=meta.index)
+
+    internal_rd_total = int(meta[rd_mask]['Sample_ID'].nunique()) if not meta.empty else 0
+    internal_rd_qualified = int(meta[rd_mask & is_qual_mask]['Sample_ID'].nunique()) if not meta.empty and qual_col else 0
+
+    biopharma_total = int(meta[bio_mask]['Sample_ID'].nunique()) if not meta.empty else 0
+    biopharma_qualified = int(meta[bio_mask & is_qual_mask]['Sample_ID'].nunique()) if not meta.empty and qual_col else 0
+
     return {
-        'samples':       int(meta['Sample_ID'].nunique()),
-        'drugs':         int(drugs.nunique()),
-        'assay_samples': a_samples,
-        'studies':       int(meta[study_col].nunique()) if study_col else 0,
-        'indications':   indications,
-        'top_drugs':     drugs.value_counts().head(20).index.tolist(),
-        'study_list':    study_list,
+        'samples':                total_samples,
+        'qualified_samples':      qualified_samples,
+        'disqualified_samples':   disqualified_samples,
+        'internal_rd_total':      internal_rd_total,
+        'internal_rd_qualified':  internal_rd_qualified,
+        'biopharma_total':        biopharma_total,
+        'biopharma_qualified':    biopharma_qualified,
+        'drugs':                  int(drugs.nunique()) if not drugs.empty else 0,
+        'assay_samples':          a_samples,
+        'studies':                int(meta[study_col].nunique()) if study_col and not meta.empty else 0,
+        'indications':            indications,
+        'top_drugs':              drugs.value_counts().head(20).index.tolist() if not drugs.empty else [],
+        'study_list':             study_list,
     }
 
 def build_indexes(meta: pd.DataFrame, overlay: pd.DataFrame) -> dict:
@@ -330,10 +390,10 @@ def build_indexes(meta: pd.DataFrame, overlay: pd.DataFrame) -> dict:
             if v:
                 idx.setdefault(v.lower(), set()).add(s)
 
-    all_sids = set(meta['Sample_ID'].unique())
+    all_sids = set(meta['Sample_ID'].unique()) if not meta.empty and 'Sample_ID' in meta.columns else set()
     qual_col = next((c for c in ['FinalQualification', 'Final Qualification', 'Final_Qualification'] if c in meta.columns), None)
-    if qual_col:
-        qual_mask = meta[qual_col].astype(str).str.strip().str.lower() == 'qualified'
+    if qual_col and not meta.empty:
+        qual_mask = meta[qual_col].apply(is_sample_qualified)
         qualified_sids = set(meta[qual_mask]['Sample_ID'].unique())
     else:
         qualified_sids = all_sids.copy()

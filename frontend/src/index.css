@@ -1444,6 +1444,70 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
+/* Qualification Stats Grid */
+.qual-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+.qual-stat-pill {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.qual-stat-pill .qs-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #64748B;
+  margin-bottom: 2px;
+}
+.qual-stat-pill .qs-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.1;
+}
+.qual-stat-pill .qs-sub {
+  font-size: 10px;
+  font-weight: 500;
+  color: #94A3B8;
+}
+.qual-stat-pill.qual-green {
+  border-left: 3px solid #16A34A;
+  background: rgba(22, 163, 74, 0.04);
+}
+.qual-stat-pill.qual-green .qs-val {
+  color: #15803D;
+}
+.qual-stat-pill.qual-red {
+  border-left: 3px solid #DC2626;
+  background: rgba(220, 38, 38, 0.04);
+}
+.qual-stat-pill.qual-red .qs-val {
+  color: #B91C1C;
+}
+.qual-stat-pill.qual-blue {
+  border-left: 3px solid #0284C7;
+  background: rgba(2, 132, 199, 0.04);
+}
+.qual-stat-pill.qual-blue .qs-val {
+  color: #0369A1;
+}
+.qual-stat-pill.qual-purple {
+  border-left: 3px solid var(--farcast-purple);
+  background: rgba(142, 36, 170, 0.04);
+}
+.qual-stat-pill.qual-purple .qs-val {
+  color: var(--farcast-purple);
+}
+
 /* Secondary Strict Filter Box */
 .strict-drug-box {
   background: linear-gradient(135deg, rgba(142, 36, 170, 0.05) 0%, rgba(26, 35, 126, 0.08) 100%);

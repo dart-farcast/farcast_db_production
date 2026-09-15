@@ -11,7 +11,7 @@ import { useStore } from '../store'
  *   onChange     — (newArray) => void
  */
 export default function MultiSelect({ field, label, placeholder, selected = [], onChange }) {
-  const { authFetch }           = useStore()
+  const { authFetch, filters } = useStore()
   const [query, setQuery]       = useState('')
   const [opts, setOpts]         = useState([])
   const [hiIdx, setHiIdx]       = useState(-1)
@@ -19,8 +19,11 @@ export default function MultiSelect({ field, label, placeholder, selected = [], 
   const inputRef = useRef(null)
   const timerRef = useRef(null)
 
+  const isQual = Boolean(filters?.qualified_only)
+
   const fetchOpts = useCallback((q) => {
-    authFetch(`/api/autocomplete?field=${field}&q=${encodeURIComponent(q || '')}`)
+    const qualParam = isQual ? '&qualified_only=true' : ''
+    authFetch(`/api/autocomplete?field=${field}&q=${encodeURIComponent(q || '')}${qualParam}`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -31,7 +34,7 @@ export default function MultiSelect({ field, label, placeholder, selected = [], 
         setHiIdx(-1)
       })
       .catch(() => setOpts([]))
-  }, [field, selected, authFetch])
+  }, [field, selected, authFetch, isQual])
 
   const handleInput = (e) => {
     const q = e.target.value
