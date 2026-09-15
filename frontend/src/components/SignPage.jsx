@@ -142,12 +142,6 @@ export default function SignPage() {
             </button>
           </form>
         )}
-
-        {/* Default Admin Quick Login Hint */}
-        <div className="auth-footer-hint">
-          <span className="hint-label">🔑 Initial Admin Access:</span>
-          <code>admin@farcastbio.com</code> / <code>admin123</code>
-        </div>
       </div>
     </div>
   )
