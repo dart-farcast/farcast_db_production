@@ -249,14 +249,23 @@ def load_assay_dfs(assay_paths: dict = None) -> dict:
             # Known assay tables mapping
             KNOWN_ASSAYS = {
                 'assay_histopathology': 'Histopathology',
-                'assay_cytokine':       'Cytokine',
-                'assay_nanostring':     'Nanostring',
-                'assay_mihc':           'Mihc'
+                'assay_cytokine':       'Cytokine Release Assay',
+                'assay_nanostring':     'NanoString',
+                'assay_mihc':           'mIHC'
             }
+
+            def _get_assay_name(tbl_str: str) -> str:
+                tbl_clean = tbl_str.lower().strip()
+                if tbl_clean in KNOWN_ASSAYS:
+                    return KNOWN_ASSAYS[tbl_clean]
+                for k, v in KNOWN_ASSAYS.items():
+                    if k.replace('assay_', '') in tbl_clean:
+                        return v
+                return tbl_str.replace('assay_', '').replace('_', ' ').title()
 
             for table in all_tables:
                 if table.startswith('assay_'):
-                    name = table.replace('assay_', '').replace('_', ' ').title()
+                    name = _get_assay_name(table)
                     try:
                         df = pd.read_sql_query(text(f'SELECT * FROM "{table}"'), engine)
                         if not df.empty:
@@ -283,10 +292,10 @@ def load_assay_dfs(assay_paths: dict = None) -> dict:
     if not dfs:
         print("  [Assay Loader Fallback] Loading assays from local cohort data files...")
         local_mapping = {
-            'Histopathology': ['06Aug2026_histo_cohort.xlsx', '22Jul2026_histo_cohort.xlsx'],
-            'Cytokine':       ['Cytokine_cohort_1_fixed.xlsx'],
-            'Nanostring':     ['Nanostring_currated_data.xlsx'],
-            'Mihc':           ['mIHC image details With Treatment Details_SS 1.xlsx'],
+            'Histopathology':         ['06Aug2026_histo_cohort.xlsx', '22Jul2026_histo_cohort.xlsx'],
+            'Cytokine Release Assay': ['Cytokine_cohort_1_fixed.xlsx'],
+            'NanoString':             ['Nanostring_currated_data.xlsx'],
+            'mIHC':                   ['mIHC image details With Treatment Details_SS 1.xlsx'],
         }
         for name, files in local_mapping.items():
             for f in files:
