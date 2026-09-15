@@ -47,8 +47,38 @@ export default function Sidebar({ onSearch }) {
           label="Drug"
           placeholder="e.g. Nivolumab_Cmax, Cisplatin…"
           selected={filters.drug}
-          onChange={v => setFilter('drug', v)}
+          onChange={v => {
+            setFilter('drug', v)
+            if (!v || v.length === 0) {
+              setFilter('strict_drug', false)
+            }
+          }}
         />
+
+        {/* ── Secondary Strict Filter Toggle ───────────────────────── */}
+        {filters.drug && filters.drug.length > 0 && (
+          <div className="strict-drug-box">
+            <div className="strict-drug-header">
+              <span className="strict-drug-badge">Secondary Filter</span>
+              <label className="switch switch-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(filters.strict_drug)}
+                  onChange={e => {
+                    setFilter('strict_drug', e.target.checked)
+                    setTimeout(() => onSearch(), 50)
+                  }}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+            <div className="strict-drug-title">Strict Drug + Control (RXA) Only</div>
+            <div className="strict-drug-hint">
+              Restricts assay readouts, table arms, and downloads strictly to the selected drug arms and control arm.
+            </div>
+          </div>
+        )}
+
         <MultiSelect
           field="arm"
           label="Arm Code"
@@ -56,6 +86,7 @@ export default function Sidebar({ onSearch }) {
           selected={filters.arm}
           onChange={v => setFilter('arm', v)}
         />
+
         <MultiSelect
           field="indication"
           label="Indication (Cancer Type)"

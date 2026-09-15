@@ -34,9 +34,15 @@ export default function ResultsTable() {
       
       const res = await authFetch('/api/cohort_assays', {
         method: 'POST',
-        body: JSON.stringify({ sample_ids: sids })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sample_ids: sids,
+          strict_drug: Boolean(filters?.strict_drug),
+          drugs: filters?.drug || []
+        })
       })
       const data = await res.json()
+
       
       const wb = XLSX.utils.book_new()
       

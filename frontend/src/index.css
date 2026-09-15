@@ -1444,5 +1444,60 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
+/* Secondary Strict Filter Box */
+.strict-drug-box {
+  background: linear-gradient(135deg, rgba(142, 36, 170, 0.05) 0%, rgba(26, 35, 126, 0.08) 100%);
+  border: 1px solid rgba(142, 36, 170, 0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: -6px 0 14px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  animation: fadeIn 0.2s ease-out;
+}
 
+.strict-drug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
 
+.strict-drug-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--farcast-purple);
+  background: rgba(142, 36, 170, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.strict-drug-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1E293B;
+  margin-bottom: 2px;
+}
+
+.strict-drug-hint {
+  font-size: 10.5px;
+  color: #64748B;
+  line-height: 1.35;
+}
+
+.switch-sm {
+  width: 32px;
+  height: 18px;
+}
+
+.switch-sm .slider:before {
+  height: 12px;
+  width: 12px;
+  left: 3px;
+  bottom: 3px;
+}
+
+.switch-sm input:checked + .slider:before {
+  transform: translateX(14px);
+}

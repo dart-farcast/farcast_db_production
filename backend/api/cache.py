@@ -39,13 +39,12 @@ def reload_cache():
     """Reload all data into the memory cache."""
     print("  FarCast DB v2: reloading data...")
     cache.metadata       = load_metadata()
+    cache.overlay        = build_overlay()
     cache.assay_paths    = discover_assays()
     cache.assay_dfs      = load_assay_dfs(cache.assay_paths)
-    cache.overlay        = build_overlay(cache.assay_dfs)
     cache.assay_presence = build_assay_presence_map(cache.assay_dfs)
     cache.stats          = compute_stats(cache.metadata, cache.overlay, cache.assay_dfs)
     cache.indexes        = build_indexes(cache.metadata, cache.overlay)
-
 
     cache.meta_idx.clear()
     for _, row in cache.metadata.iterrows():

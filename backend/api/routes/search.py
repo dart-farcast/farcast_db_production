@@ -46,6 +46,17 @@ def _index_match(index: dict, terms: list, partial: bool = True) -> set:
     return result
 
 
+def is_control_arm(arm_code: str, drug_name: str) -> bool:
+    """Check if an arm is a control / vehicle / baseline arm."""
+    ac = str(arm_code).strip().upper()
+    dn = str(drug_name).strip().lower()
+    if ac in ('RXA', 'RX A', 'CTRL', 'CONTROL', 'CONTROL ARM', 'VEHICLE', 'DMSO', 'T0'):
+        return True
+    if any(ctrl in dn for ctrl in ('control', 'vehicle', 'dmso', 'media', 'baseline', 'untreated', 't0')):
+        return True
+    return False
+
+
 @router.get('/search')
 def search(
     drug:           str = '',
@@ -59,6 +70,7 @@ def search(
     timepoint:      str = '',
     qualified_only: str = '',
     qualified:      str = '',
+    strict_drug:    str = '',   # secondary strict filter: selected drug + control arm only
     current_user: dict = Depends(get_current_whitelisted_user),
 ):
     idx      = cache.indexes
@@ -73,6 +85,7 @@ def search(
     studies    = _parse_multi(study)
     projects   = _parse_multi(project)
     assay_list = _parse_multi(assay)
+    is_strict  = strict_drug.strip().lower() in ('true', '1', 'yes') and bool(drugs)
 
     # Start from the full sample universe
     final_sids: set = idx['all_sids'].copy()
@@ -90,13 +103,11 @@ def search(
 
 
     # ── 1. Assay pre-filter: samples must be present in ALL selected assays (AND) ──
-    # Starting from all_sids and intersecting ensures empty assay_sids_map entries
-    # still correctly zero out the results.
     if assay_list:
-        assay_universe: set = idx['all_sids'].copy()  # start full
+        assay_universe: set = idx['all_sids'].copy()
         for aname in assay_list:
             sids_for_assay = cache.assay_sids_map.get(aname, set())
-            assay_universe &= sids_for_assay           # AND: must be in every assay
+            assay_universe &= sids_for_assay
         final_sids &= assay_universe
 
     # ── 2. Drug filter (partial match) ────────────────────────────────────────
@@ -125,11 +136,23 @@ def search(
     if not final_sids:
         return {'total': 0, 'results': [], 'assay_cols': []}
 
-    # ── 6. Build matched (sample_id, arm_code) pairs for arm highlighting ────
+    # ── 6. Build matched (sample_id, arm_code) pairs for arm highlighting & filtering ────
     ov_filtered = overlay[overlay['Sample_ID'].isin(final_sids)]
 
     any_arm_drug_filter = bool(drugs or arms)
-    if any_arm_drug_filter:
+    if is_strict:
+        # Strict mode: keep only matched drug arms AND control arms (RXA/Control)
+        drug_mask = ov_filtered['Drug'].str.lower().apply(
+            lambda v: any(d.lower() in v.lower() for d in drugs))
+        ctrl_mask = ov_filtered.apply(
+            lambda r: is_control_arm(r['Arm_Code'], r['Drug']), axis=1)
+        strict_mask = drug_mask | ctrl_mask
+        
+        matched_pairs = set(zip(ov_filtered[strict_mask]['Sample_ID'],
+                                ov_filtered[strict_mask]['Arm_Code']))
+        # In strict mode, limit overlay rendering strictly to these arms
+        ov_for_arms = ov_filtered[strict_mask]
+    elif any_arm_drug_filter:
         mask = pd.Series(True, index=ov_filtered.index)
         if drugs:
             mask &= ov_filtered['Drug'].str.lower().apply(
@@ -139,8 +162,10 @@ def search(
                 lambda v: any(a.lower() in v.lower() for a in arms))
         matched_pairs = set(zip(ov_filtered[mask]['Sample_ID'],
                                 ov_filtered[mask]['Arm_Code']))
+        ov_for_arms = ov_filtered
     else:
         matched_pairs = set(zip(ov_filtered['Sample_ID'], ov_filtered['Arm_Code']))
+        ov_for_arms = ov_filtered
 
     # ── 7. Load assay row data for selected assays ────────────────────────────
     assay_by_sid: dict = {}
@@ -165,8 +190,8 @@ def search(
             # Restrict assay rows to matched samples
             adf = adf[adf['Sample_ID'].isin(final_sids)]
 
-            # If arm/drug filter active, restrict assay rows to matched pairs only
-            if arm_col and any_arm_drug_filter and matched_pairs:
+            # If strict filter or arm/drug filter active, restrict assay rows to matched pairs only
+            if arm_col and (is_strict or any_arm_drug_filter) and matched_pairs:
                 adf['Arms'] = adf['Arms'].str.strip().str.upper()
                 adf = adf[adf.apply(
                     lambda r: (r['Sample_ID'], r['Arms']) in matched_pairs, axis=1)]
@@ -190,13 +215,14 @@ def search(
 
     for sid in sorted(final_sids):
         m_dict    = meta_idx.get(sid, {'Sample_ID': sid})
-        sample_ov = ov_filtered[ov_filtered['Sample_ID'] == sid]
+        sample_ov = ov_for_arms[ov_for_arms['Sample_ID'] == sid]
         arms_out  = [
             {
                 'position': r['Position'],
                 'arm_code': r['Arm_Code'],
                 'drug':     r['Drug'],
                 'matched':  (sid, r['Arm_Code']) in matched_pairs,
+                'is_control': is_control_arm(r['Arm_Code'], r['Drug']),
             }
             for _, r in sample_ov.iterrows()
         ]
@@ -212,17 +238,37 @@ def search(
 
 
 @router.get('/sample_assays')
-def sample_assays(sample_id: str = ''):
-    """Return all assay rows for one sample across every assay type."""
+def sample_assays(
+    sample_id:   str = '',
+    strict_drug: str = '',
+    drug:        str = '',
+):
+    """Return all assay rows for one sample across every assay type (with optional strict drug + control arm filter)."""
     if not sample_id:
         return {}
     sid = sample_id.strip()
+    is_strict = strict_drug.strip().lower() in ('true', '1', 'yes') and bool(drug)
+    drugs = _parse_multi(drug) if is_strict else []
+
+    allowed_arms = set()
+    if is_strict:
+        ov = cache.overlay[cache.overlay['Sample_ID'] == sid]
+        if not ov.empty:
+            drug_mask = ov['Drug'].str.lower().apply(
+                lambda v: any(d.lower() in v.lower() for d in drugs))
+            ctrl_mask = ov.apply(
+                lambda r: is_control_arm(r['Arm_Code'], r['Drug']), axis=1)
+            allowed_arms = set(ov[drug_mask | ctrl_mask]['Arm_Code'].str.strip().str.upper())
+
     result = {}
     for name, df in cache.assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
+        arm_col = find_col(df, ARM_ALIASES)
         if not sid_col:
             continue
         rows = df[df[sid_col].str.strip() == sid]
+        if is_strict and allowed_arms and arm_col and arm_col in rows.columns:
+            rows = rows[rows[arm_col].str.strip().str.upper().isin(allowed_arms)]
         if not rows.empty:
             result[name] = {
                 'columns': list(rows.columns),
@@ -230,27 +276,52 @@ def sample_assays(sample_id: str = ''):
             }
     return result
 
+
 class CohortRequest(BaseModel):
-    sample_ids: List[str]
+    sample_ids:  List[str]
+    strict_drug: bool = False
+    drugs:       List[str] = []
+
 
 @router.post('/cohort_assays')
 def cohort_assays(req: CohortRequest):
-    """Return all assay rows for multiple samples across every assay type."""
+    """Return all assay rows for multiple samples across every assay type (with strict drug + control arm filtering support)."""
     if not req.sample_ids:
         return {}
     sids = {sid.strip() for sid in req.sample_ids if sid.strip()}
     if not sids:
         return {}
-    
+
+    strict_pairs = set()
+    if req.strict_drug and req.drugs:
+        ov = cache.overlay[cache.overlay['Sample_ID'].isin(sids)]
+        if not ov.empty:
+            drug_mask = ov['Drug'].str.lower().apply(
+                lambda v: any(d.lower() in v.lower() for d in req.drugs))
+            ctrl_mask = ov.apply(
+                lambda r: is_control_arm(r['Arm_Code'], r['Drug']), axis=1)
+            strict_ov = ov[drug_mask | ctrl_mask]
+            strict_pairs = set(zip(strict_ov['Sample_ID'].str.strip(),
+                                   strict_ov['Arm_Code'].str.strip().str.upper()))
+
     result = {}
     for name, df in cache.assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
+        arm_col = find_col(df, ARM_ALIASES)
         if not sid_col:
             continue
         rows = df[df[sid_col].astype(str).str.strip().isin(sids)]
+        
+        if req.strict_drug and strict_pairs and arm_col and arm_col in rows.columns:
+            rows = rows[rows.apply(
+                lambda r: (str(r[sid_col]).strip(), str(r[arm_col]).strip().upper()) in strict_pairs,
+                axis=1
+            )]
+
         if not rows.empty:
             result[name] = {
                 'columns': list(rows.columns),
                 'rows':    rows.to_dict(orient='records'),
             }
     return result
+

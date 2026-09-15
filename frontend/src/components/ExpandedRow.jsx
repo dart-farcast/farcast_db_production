@@ -38,9 +38,15 @@ function downloadCSV(meta, sid) {
 
 import { useStore } from '../store'
 
-async function downloadAssaysExcel(sid, meta, arms, authFetch) {
+async function downloadAssaysExcel(sid, meta, arms, authFetch, activeFilters = {}) {
   try {
-    const res = await authFetch(`/api/sample_assays?sample_id=${encodeURIComponent(sid)}`)
+    const isStrict = Boolean(activeFilters.strict_drug && activeFilters.drug?.length)
+    const qs = new URLSearchParams({
+      sample_id: sid,
+      ...(isStrict ? { strict_drug: 'true', drug: (activeFilters.drug || []).join(',') } : {})
+    }).toString()
+
+    const res = await authFetch(`/api/sample_assays?${qs}`)
     const data = await res.json()
     
     const wb = XLSX.utils.book_new()
@@ -112,7 +118,14 @@ export default function ExpandedRow({ row, assayCols, colSpan, selectedAssays = 
     }
     setClickedAssay(assayName)
     setFetchLoading(true)
-    authFetch(`/api/sample_assays?sample_id=${encodeURIComponent(sid)}`)
+    
+    const isStrict = Boolean(activeFilters.strict_drug && activeFilters.drug?.length)
+    const qs = new URLSearchParams({
+      sample_id: sid,
+      ...(isStrict ? { strict_drug: 'true', drug: (activeFilters.drug || []).join(',') } : {})
+    }).toString()
+
+    authFetch(`/api/sample_assays?${qs}`)
       .then(r => r.json())
       .then(data => {
         const entry = data[assayName]
@@ -121,7 +134,8 @@ export default function ExpandedRow({ row, assayCols, colSpan, selectedAssays = 
         setFetchLoading(false)
       })
       .catch(() => setFetchLoading(false))
-  }, [clickedAssay, sid, authFetch])
+  }, [clickedAssay, sid, authFetch, activeFilters])
+
 
   // Which rows/cols to display in the assay table
   const showRows = fetchedRows !== null ? fetchedRows : []

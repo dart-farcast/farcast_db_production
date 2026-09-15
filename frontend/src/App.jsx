@@ -47,6 +47,9 @@ export default function App() {
 
   add('Assay',      filters.assay)
   if (filters.sample) activeTags.push({ label: 'Sample', val: filters.sample })
+  if (filters.strict_drug && filters.drug?.length > 0) {
+    activeTags.push({ label: 'Strict Filter', val: 'Selected Drug(s) + Control Arm (RXA) Only' })
+  }
 
   return (
     <div className="app-layout">

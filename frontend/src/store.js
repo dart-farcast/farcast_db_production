@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 const DEFAULT_FILTERS = {
   drug:           [],
+  strict_drug:    false,
   arm:            [],
   indication:     [],
   tumor_site:     [],
@@ -17,6 +18,7 @@ function buildQS(filters) {
   const p = new URLSearchParams()
   const arr = (k, v) => { if (v?.length) p.set(k, v.join(',')) }
   arr('drug',       filters.drug)
+  if (filters.strict_drug && filters.drug?.length) p.set('strict_drug', 'true')
   arr('arm',        filters.arm)
   arr('indication', filters.indication)
   arr('tumor_site', filters.tumor_site)
@@ -28,6 +30,7 @@ function buildQS(filters) {
   if (filters.qualified_only) p.set('qualified_only', 'true')
   return p.toString()
 }
+
 
 const savedToken = localStorage.getItem('farcast_token') || null
 let savedUser = null
