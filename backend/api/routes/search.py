@@ -46,13 +46,48 @@ def _index_match(index: dict, terms: list, partial: bool = True) -> set:
     return result
 
 
-def is_control_arm(arm_code: str, drug_name: str) -> bool:
-    """Check if an arm is a control / vehicle / baseline arm."""
+def _norm_drug(s: str) -> str:
+    """Normalize drug name for exact strict comparison (whitespace, casing, underscores)."""
+    if not s:
+        return ""
+    return " ".join(str(s).strip().lower().split())
+
+
+def is_strict_drug_match(drug_val: str, selected_drugs: list) -> bool:
+    """
+    Check if drug_val strictly matches ANY of the selected_drugs.
+    Unlike substring matching, 'Nivolumab_Cmax' will NOT match 'Nivolumab_Cmax + Carboplatin'.
+    """
+    if not drug_val or not selected_drugs:
+        return False
+    norm_val = _norm_drug(drug_val)
+    norm_val_clean = norm_val.replace('_', ' ').replace('-', ' ')
+    for d in selected_drugs:
+        norm_d = _norm_drug(d)
+        if norm_val == norm_d:
+            return True
+        norm_d_clean = norm_d.replace('_', ' ').replace('-', ' ')
+        if norm_val_clean == norm_d_clean:
+            return True
+    return False
+
+
+def is_control_arm(arm_code: str, drug_name: str = '', position: str = '') -> bool:
+    """
+    Check if an arm is strictly the control arm (RXA / Control / Vehicle).
+    Excludes drug treatment arms that might have 'Control' in a secondary field.
+    """
     ac = str(arm_code).strip().upper()
     dn = str(drug_name).strip().lower()
-    if ac in ('RXA', 'RX A', 'CTRL', 'CONTROL', 'CONTROL ARM', 'VEHICLE', 'DMSO', 'T0'):
+    pos = str(position).strip().upper()
+
+    # Standard Control Arm Codes
+    if ac in ('RXA', 'RX A', 'RX-A', 'ARM1', 'CTRL', 'CONTROL', 'CONTROL ARM', 'VEHICLE', 'DMSO', 'T0'):
         return True
-    if any(ctrl in dn for ctrl in ('control', 'vehicle', 'dmso', 'media', 'baseline', 'untreated', 't0')):
+    if ac.startswith('RXA') or ac.startswith('CTRL'):
+        return True
+    # Position A with vehicle / baseline / untreated drug description
+    if pos == 'A' and any(c in dn for c in ('control', 'vehicle', 'dmso', 'media', 'baseline', 'untreated', 't0', 'igg', 'rxa')):
         return True
     return False
 
@@ -110,9 +145,15 @@ def search(
             assay_universe &= sids_for_assay
         final_sids &= assay_universe
 
-    # ── 2. Drug filter (partial match) ────────────────────────────────────────
+    # ── 2. Drug filter (strict exact or partial match) ────────────────────────
     if drugs:
-        final_sids &= _index_match(idx['drug'], drugs, partial=True)
+        if is_strict:
+            strict_matching_sids = set(
+                overlay[overlay['Drug'].apply(lambda v: is_strict_drug_match(v, drugs))]['Sample_ID']
+            )
+            final_sids &= strict_matching_sids
+        else:
+            final_sids &= _index_match(idx['drug'], drugs, partial=True)
 
     # ── 3. Arm filter (partial match, index keys are lowercase) ───────────────
     if arms:
@@ -141,11 +182,10 @@ def search(
 
     any_arm_drug_filter = bool(drugs or arms)
     if is_strict:
-        # Strict mode: keep only matched drug arms AND control arms (RXA/Control)
-        drug_mask = ov_filtered['Drug'].str.lower().apply(
-            lambda v: any(d.lower() in v.lower() for d in drugs))
+        # Strict mode: keep only EXACT matched drug arms AND control arm (RXA / Vehicle)
+        drug_mask = ov_filtered['Drug'].apply(lambda v: is_strict_drug_match(v, drugs))
         ctrl_mask = ov_filtered.apply(
-            lambda r: is_control_arm(r['Arm_Code'], r['Drug']), axis=1)
+            lambda r: is_control_arm(r.get('Arm_Code', ''), r.get('Drug', ''), r.get('Position', '')), axis=1)
         strict_mask = drug_mask | ctrl_mask
         
         matched_pairs = set(zip(ov_filtered[strict_mask]['Sample_ID'],
@@ -222,7 +262,7 @@ def search(
                 'arm_code': r['Arm_Code'],
                 'drug':     r['Drug'],
                 'matched':  (sid, r['Arm_Code']) in matched_pairs,
-                'is_control': is_control_arm(r['Arm_Code'], r['Drug']),
+                'is_control': is_control_arm(r.get('Arm_Code', ''), r.get('Drug', ''), r.get('Position', '')),
             }
             for _, r in sample_ov.iterrows()
         ]
@@ -254,11 +294,10 @@ def sample_assays(
     if is_strict:
         ov = cache.overlay[cache.overlay['Sample_ID'] == sid]
         if not ov.empty:
-            drug_mask = ov['Drug'].str.lower().apply(
-                lambda v: any(d.lower() in v.lower() for d in drugs))
+            drug_mask = ov['Drug'].apply(lambda v: is_strict_drug_match(v, drugs))
             ctrl_mask = ov.apply(
-                lambda r: is_control_arm(r['Arm_Code'], r['Drug']), axis=1)
-            allowed_arms = set(ov[drug_mask | ctrl_mask]['Arm_Code'].str.strip().str.upper())
+                lambda r: is_control_arm(r.get('Arm_Code', ''), r.get('Drug', ''), r.get('Position', '')), axis=1)
+            allowed_arms = set(ov[drug_mask | ctrl_mask]['Arm_Code'].astype(str).str.strip().str.upper())
 
     result = {}
     for name, df in cache.assay_dfs.items():
@@ -266,9 +305,9 @@ def sample_assays(
         arm_col = find_col(df, ARM_ALIASES)
         if not sid_col:
             continue
-        rows = df[df[sid_col].str.strip() == sid]
+        rows = df[df[sid_col].astype(str).str.strip() == sid]
         if is_strict and allowed_arms and arm_col and arm_col in rows.columns:
-            rows = rows[rows[arm_col].str.strip().str.upper().isin(allowed_arms)]
+            rows = rows[rows[arm_col].astype(str).str.strip().str.upper().isin(allowed_arms)]
         if not rows.empty:
             result[name] = {
                 'columns': list(rows.columns),
@@ -296,13 +335,12 @@ def cohort_assays(req: CohortRequest):
     if req.strict_drug and req.drugs:
         ov = cache.overlay[cache.overlay['Sample_ID'].isin(sids)]
         if not ov.empty:
-            drug_mask = ov['Drug'].str.lower().apply(
-                lambda v: any(d.lower() in v.lower() for d in req.drugs))
+            drug_mask = ov['Drug'].apply(lambda v: is_strict_drug_match(v, req.drugs))
             ctrl_mask = ov.apply(
-                lambda r: is_control_arm(r['Arm_Code'], r['Drug']), axis=1)
+                lambda r: is_control_arm(r.get('Arm_Code', ''), r.get('Drug', ''), r.get('Position', '')), axis=1)
             strict_ov = ov[drug_mask | ctrl_mask]
-            strict_pairs = set(zip(strict_ov['Sample_ID'].str.strip(),
-                                   strict_ov['Arm_Code'].str.strip().str.upper()))
+            strict_pairs = set(zip(strict_ov['Sample_ID'].astype(str).str.strip(),
+                                   strict_ov['Arm_Code'].astype(str).str.strip().str.upper()))
 
     result = {}
     for name, df in cache.assay_dfs.items():

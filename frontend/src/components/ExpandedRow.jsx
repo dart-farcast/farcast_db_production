@@ -304,7 +304,7 @@ export default function ExpandedRow({ row, assayCols, colSpan, selectedAssays = 
               <button className="dl-btn" onClick={() => downloadCSV(meta, sid)}>
                 ↓ Metadata CSV
               </button>
-              <button className="dl-btn" style={{ background: 'var(--accent)', color: '#FFFFFF', border: 'none', fontWeight: 600 }} onClick={() => downloadAssaysExcel(sid, meta, arms, authFetch)}>
+              <button className="dl-btn" style={{ background: 'var(--accent)', color: '#FFFFFF', border: 'none', fontWeight: 600 }} onClick={() => downloadAssaysExcel(sid, meta, arms, authFetch, activeFilters)}>
                 ↓ Assay Data (Excel)
               </button>
             </div>
