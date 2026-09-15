@@ -11,7 +11,7 @@ const DEFAULT_FILTERS = {
   sample:         '',
   assay:          [],
   timepoint:      '',
-  qualified_only: false,
+  qualified_only: true,
 }
 
 function buildQS(filters) {
