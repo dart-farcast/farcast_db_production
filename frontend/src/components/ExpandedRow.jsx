@@ -61,7 +61,6 @@ async function downloadAssaysExcel(sid, meta, arms, authFetch, activeFilters = {
     // Add Treatment Arm Details sheet
     if (arms && arms.length > 0) {
       const armRows = arms.map(a => ({
-        Position: a.position,
         Arm_Code: a.arm_code,
         Drug_Treatment: a.drug || ''
       }))
@@ -186,15 +185,13 @@ export default function ExpandedRow({ row, assayCols, colSpan, selectedAssays = 
                 <table className="arms-tbl">
                   <thead>
                     <tr>
-                      <th>Position</th>
-                      <th>Arm Code</th>
-                      <th>Drug / Treatment</th>
+                      <th style={{ width: '30%' }}>Arm Code</th>
+                      <th style={{ width: '70%' }}>Drug / Treatment</th>
                     </tr>
                   </thead>
                   <tbody>
                     {arms.map((a, i) => (
                       <tr key={i} className={a.matched ? 'arm-matched' : ''}>
-                        <td className="arm-pos">{a.position}</td>
                         <td className="arm-code-cell">
                           <Highlight text={a.arm_code} terms={activeFilters.arm || []} />
                         </td>

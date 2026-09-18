@@ -104,7 +104,7 @@ def build_overlay() -> pd.DataFrame:
             print("  [Overlay Loader] Table 'overlay' not found in Database.")
     except Exception as e:
         print(f"  [Overlay Loader Error] Failed loading overlay from Database: {e}")
-    return pd.DataFrame(columns=['Sample_ID', 'Position', 'Arm_Code', 'Drug'])
+    return pd.DataFrame(columns=['Sample_ID', 'Arm_Code', 'Drug'])
 
 
 def load_assay_dfs(assay_paths: dict = None) -> dict:

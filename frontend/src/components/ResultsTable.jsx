@@ -65,7 +65,6 @@ export default function ResultsTable() {
           r.arms.forEach(a => {
             armRows.push({
               Sample_ID: sid,
-              Position: a.position,
               Arm_Code: a.arm_code,
               Drug_Treatment: a.drug || ''
             })
