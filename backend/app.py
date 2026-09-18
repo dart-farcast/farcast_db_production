@@ -3,6 +3,12 @@ FarCast DB v2 — FastAPI entry point
 Run with:  uvicorn app:app --reload --port 5052
 """
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse

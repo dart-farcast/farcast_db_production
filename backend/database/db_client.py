@@ -93,12 +93,19 @@ class PostgresCursorWrapper:
         except Exception:
             return None
 
+DEFAULT_DB_URL = "postgresql://postgres.nviuiklcusydkxoctlsj:farcast2026@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
+
 def get_db_connection() -> DBConnection:
     """
     Returns DBConnection instance.
     Prefers Supabase Cloud PostgreSQL if DATABASE_URL is configured; otherwise uses SQLite.
     """
-    db_url = os.environ.get('DATABASE_URL', '').strip()
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
+    db_url = os.environ.get('DATABASE_URL', '').strip() or DEFAULT_DB_URL
     if db_url and HAS_PSYCOPG2:
         try:
             conn = psycopg2.connect(db_url, connect_timeout=10)

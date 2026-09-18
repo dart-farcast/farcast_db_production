@@ -58,10 +58,15 @@ def find_col(df: pd.DataFrame, aliases: list):
     return None
 
 
+DEFAULT_DB_URL = "postgresql://postgres.nviuiklcusydkxoctlsj:farcast2026@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
+
 def get_db_engine():
-    db_url = os.environ.get('DATABASE_URL', '').strip()
-    if not db_url:
-        raise ValueError("DATABASE_URL is not configured in environment.")
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
+    db_url = os.environ.get('DATABASE_URL', '').strip() or DEFAULT_DB_URL
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
     return create_engine(db_url, connect_args={'connect_timeout': 15})

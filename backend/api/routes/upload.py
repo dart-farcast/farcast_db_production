@@ -1,7 +1,9 @@
 import os, re
 from fastapi import APIRouter, UploadFile, Form
 from ..cache import cache
-from database.data_loader import rcsv, DATA_DIR, load_assay_dfs, build_assay_presence_map, compute_stats, build_indexes
+from database.data_loader import clean_df, load_assay_dfs, build_assay_presence_map, compute_stats, build_indexes
+import pandas as pd
+DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data'))
 def discover_assays(): return {}
 
 router = APIRouter()
@@ -18,7 +20,7 @@ async def upload(table: str = Form(...), file: UploadFile = None):
     with open(path, 'wb') as f:
         f.write(content)
     try:
-        df = rcsv(path)
+        df = clean_df(pd.read_csv(path, dtype=str))
         # Reload assay data into cache
         cache.assay_paths    = discover_assays()
         cache.assay_dfs      = load_assay_dfs(cache.assay_paths)
