@@ -258,10 +258,9 @@ def search(
         sample_ov = ov_for_arms[ov_for_arms['Sample_ID'] == sid]
         arms_out  = [
             {
-                'position': r['Position'],
-                'arm_code': r['Arm_Code'],
-                'drug':     r['Drug'],
-                'matched':  (sid, r['Arm_Code']) in matched_pairs,
+                'arm_code':   r.get('Arm_Code', ''),
+                'drug':       r.get('Drug', ''),
+                'matched':    (sid, r.get('Arm_Code', '')) in matched_pairs,
                 'is_control': is_control_arm(r.get('Arm_Code', ''), r.get('Drug', ''), r.get('Position', '')),
             }
             for _, r in sample_ov.iterrows()
