@@ -11,7 +11,7 @@ const COLS = [
 
   { key: 'TumorSite',    label: 'Tumor Site',  w: 110  },
   { key: 'Gender',       label: 'Gender',      w: 70   },
-  { key: 'arms',         label: 'Arms / Drug', w: 160  },
+  { key: 'arms',         label: 'Treatment Details / Arms', w: 220 },
   { key: 'assays',       label: 'Assays',      w: 180  },
 ]
 
@@ -180,12 +180,24 @@ export default function ResultsTable() {
                       {row.metadata?.Gender || '—'}
                     </td>
                     <td>
-                      {row.arms?.filter(a => a.matched).map((a, j) => (
-                        <span key={j} className="drug-tag">{a.drug || a.arm_code}</span>
-                      ))}
-                      {row.arms?.filter(a => !a.matched).slice(0, 2).map((a, j) => (
-                        <span key={j} className="drug-tag" style={{ opacity: .5 }}>{a.arm_code}</span>
-                      ))}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', alignItems: 'center' }}>
+                        {row.arms && row.arms.length > 0 ? (
+                          row.arms.map((a, j) => {
+                            const label = (a.drug && String(a.drug).trim()) ? a.drug : a.arm_code
+                            return (
+                              <span
+                                key={j}
+                                className={`drug-tag${a.matched ? ' matched' : ''}`}
+                                title={a.drug ? `${a.arm_code}: ${a.drug}` : a.arm_code}
+                              >
+                                {label}
+                              </span>
+                            )
+                          })
+                        ) : (
+                          <span style={{ color: 'var(--muted)' }}>—</span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       {(row.assays_present || []).map(a => (
