@@ -58,7 +58,7 @@ export default function SignPage() {
           <div style={{ marginBottom: 12 }}>
             <FarcastLogo height={42} showSub={true} theme="dark" />
           </div>
-          <h2>Farcast TruTumor Multimodal Database</h2>
+          <h2>Farcast Data Explorer</h2>
           <p className="auth-subtitle">Production Research & Assay Platform</p>
         </div>
 
