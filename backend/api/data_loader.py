@@ -31,6 +31,8 @@ def clean_drug_value(d, arm_code='') -> str:
     if not d or pd.isna(d):
         return ''
     d_clean = str(d).strip()
+    if d_clean.lower() == 'control':
+        return 'Control'
     d_upper = d_clean.upper()
     if any(phrase in d_upper for phrase in [
         'NOT MENTIONED', 'MISSED DETAILS', 'INSERT STUDY', 'TX RECEIVED WITH', 'DRUG DETAILS'
