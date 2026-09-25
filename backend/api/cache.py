@@ -30,6 +30,7 @@ class AppCache:
     meta_idx:       dict         = field(default_factory=dict)
     # reverse lookup: {assay_name: set(sample_ids)}
     assay_sids_map: dict         = field(default_factory=dict)
+    last_error:     str          = ""
 
 
 cache = AppCache()
@@ -38,6 +39,7 @@ cache = AppCache()
 def reload_cache():
     """Reload all data into the memory cache."""
     print("  FarCast DB v2: reloading data...")
+    cache.last_error = ""
     try:
         cache.metadata       = load_metadata()
         cache.overlay        = build_overlay()
@@ -61,6 +63,8 @@ def reload_cache():
         print(f"  Loaded {cache.stats.get('samples', 0)} samples, "
               f"{len(cache.assay_dfs)} assays - ready.")
     except Exception as e:
+        import traceback
+        cache.last_error = f"{e}\n{traceback.format_exc()}"
         print(f"  [Cache Reload Warning] Error during cache initialization: {e}")
 
 

@@ -40,8 +40,20 @@ from api.cache import cache, reload_cache
 
 @app.get('/api/refresh')
 async def refresh_cache():
-    await run_in_threadpool(reload_cache)
-    return {"status": "success", "stats": cache.stats}
+    import traceback
+    err = None
+    try:
+        await run_in_threadpool(reload_cache)
+    except Exception as e:
+        err = f"{e}\n{traceback.format_exc()}"
+    return {
+        "status": "success" if not err else "error",
+        "error": err,
+        "stats": cache.stats,
+        "meta_len": len(cache.metadata),
+        "overlay_len": len(cache.overlay),
+        "assays": {k: len(v) for k, v in cache.assay_dfs.items()}
+    }
 
 # Protected Database Endpoints (Requires valid JWT & Whitelisted Email)
 app.include_router(stats.router,        prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
@@ -55,7 +67,11 @@ def hardcode():
     return {
         'alive': True,
         'unique_sids': int(df['Sample_ID'].nunique()) if df is not None and 'Sample_ID' in df.columns else 0,
-        'stats': cache.stats
+        'last_error': cache.last_error,
+        'stats': cache.stats,
+        'meta_len': len(cache.metadata),
+        'overlay_len': len(cache.overlay),
+        'assays': {k: len(v) for k, v in cache.assay_dfs.items()}
     }
 
 # ── Serve React production build ─────────────────────────────────────────────
