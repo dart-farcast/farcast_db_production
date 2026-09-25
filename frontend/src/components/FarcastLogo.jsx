@@ -7,7 +7,7 @@ import React from 'react'
  * - Clearspace Rule: Enforced around logo
  * - Colors: Primary Navy (#1E2859), Secondary Purple (#B14FC4)
  */
-export default function FarcastLogo({ height = 36, withContainer = true }) {
+export default function FarcastLogo({ height = 34, withContainer = true }) {
   const logoImg = (
     <img 
       src="/farcast_biodynamics_logo.png" 
@@ -27,11 +27,12 @@ export default function FarcastLogo({ height = 36, withContainer = true }) {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
+          justifyContent: 'center',
           background: '#FFFFFF',
-          padding: '6px 14px',
+          padding: '4px 10px',
           borderRadius: '8px',
           border: '1px solid #E2E8F0',
-          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
           cursor: 'pointer'
         }}
       >

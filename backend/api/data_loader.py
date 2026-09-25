@@ -78,17 +78,13 @@ def load_metadata() -> pd.DataFrame:
     """Load metadata table strictly from PostgreSQL database."""
     try:
         engine = get_db_engine()
-        insp = inspect(engine)
-        if insp.has_table('metadata'):
-            df = pd.read_sql_table('metadata', engine)
-            if not df.empty and 'Sample_ID' in df.columns:
-                print(f"  Successfully loaded {len(df)} metadata rows from Database.")
-                df = clean_df(df)
-                if 'Study' in df.columns and 'RegisterType' not in df.columns:
-                    df['RegisterType'] = df['Study']
-                return df
-        else:
-            print("  [Metadata Loader] Table 'metadata' not found in Database.")
+        df = pd.read_sql_query(text('SELECT * FROM "metadata"'), engine)
+        if not df.empty and 'Sample_ID' in df.columns:
+            print(f"  Successfully loaded {len(df)} metadata rows from Database.")
+            df = clean_df(df)
+            if 'Study' in df.columns and 'RegisterType' not in df.columns:
+                df['RegisterType'] = df['Study']
+            return df
     except Exception as e:
         print(f"  [Metadata Loader Error] Failed loading metadata from Database: {e}")
     return pd.DataFrame()
@@ -98,17 +94,13 @@ def build_overlay() -> pd.DataFrame:
     """Load overlay table strictly from PostgreSQL database."""
     try:
         engine = get_db_engine()
-        insp = inspect(engine)
-        if insp.has_table('overlay'):
-            df = pd.read_sql_table('overlay', engine)
-            if not df.empty and 'Sample_ID' in df.columns:
-                print(f"  Successfully loaded {len(df)} overlay rows from Database.")
-                df = clean_df(df)
-                if 'Drug' in df.columns:
-                    df['Drug'] = df['Drug'].apply(clean_drug_value)
-                return df
-        else:
-            print("  [Overlay Loader] Table 'overlay' not found in Database.")
+        df = pd.read_sql_query(text('SELECT * FROM "overlay"'), engine)
+        if not df.empty and 'Sample_ID' in df.columns:
+            print(f"  Successfully loaded {len(df)} overlay rows from Database.")
+            df = clean_df(df)
+            if 'Drug' in df.columns:
+                df['Drug'] = df['Drug'].apply(clean_drug_value)
+            return df
     except Exception as e:
         print(f"  [Overlay Loader Error] Failed loading overlay from Database: {e}")
     return pd.DataFrame(columns=['Sample_ID', 'Arm_Code', 'Drug'])
