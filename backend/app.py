@@ -55,6 +55,35 @@ async def refresh_cache():
         "assays": {k: len(v) for k, v in cache.assay_dfs.items()}
     }
 
+@app.get('/api/test_db')
+def test_db():
+    import traceback
+    from database.data_loader import get_db_engine
+    from sqlalchemy import text
+    import os
+
+    raw_url = os.environ.get('DATABASE_URL', '')
+    masked_url = raw_url.split('@')[-1] if '@' in raw_url else (raw_url[:15] + '...') if raw_url else 'EMPTY'
+
+    result = {
+        'has_env_DATABASE_URL': bool(raw_url),
+        'db_host_info': masked_url,
+        'metadata_cnt': None,
+        'overlay_cnt': None,
+        'histo_cnt': None,
+        'error': None
+    }
+    try:
+        engine = get_db_engine()
+        with engine.connect() as conn:
+            result['metadata_cnt'] = conn.execute(text('SELECT count(*) FROM "metadata"')).scalar()
+            result['overlay_cnt'] = conn.execute(text('SELECT count(*) FROM "overlay"')).scalar()
+            result['histo_cnt'] = conn.execute(text('SELECT count(*) FROM "assay_histopathology"')).scalar()
+    except Exception as e:
+        result['error'] = f"{e}\n{traceback.format_exc()}"
+
+    return result
+
 # Protected Database Endpoints (Requires valid JWT & Whitelisted Email)
 app.include_router(stats.router,        prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
 app.include_router(autocomplete.router, prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
