@@ -70,7 +70,9 @@ def get_db_engine():
 
     db_url = os.environ.get('DATABASE_URL', '').strip() or DEFAULT_DB_URL
     if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        db_url = db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    elif db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
     return create_engine(db_url, connect_args={'connect_timeout': 15})
 
 
