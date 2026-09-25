@@ -10,8 +10,8 @@ import React from 'react'
 export default function FarcastLogo({ height = 36, withContainer = true }) {
   const logoImg = (
     <img 
-      src="/farcast_biosciences_logo.png" 
-      alt="Farcast Biosciences" 
+      src="/farcast_biodynamics_logo.png" 
+      alt="Farcast Biodynamics" 
       style={{ 
         height: `${height}px`,
         width: 'auto',
