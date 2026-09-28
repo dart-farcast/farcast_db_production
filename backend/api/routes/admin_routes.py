@@ -224,4 +224,31 @@ def get_audit_logs(current_admin: dict = Depends(get_current_admin_user)):
             "logs": [dict(l) for l in logs]
         }
 
+from fastapi.concurrency import run_in_threadpool
+from ..cache import reload_cache
+
+@router.post("/sync_database")
+async def sync_database(current_admin: dict = Depends(get_current_admin_user)):
+    import traceback
+    err = None
+    try:
+        await run_in_threadpool(reload_cache)
+        log_audit(current_admin["email"], "SYNC_DATABASE", "Manually triggered database synchronization and cache reload from Supabase.")
+    except Exception as e:
+        err = f"{e}\n{traceback.format_exc()}"
+        return {
+            "success": False,
+            "error": err
+        }
+
+    return {
+        "success": True,
+        "message": "Database cache successfully synchronized from Supabase.",
+        "stats": cache.stats,
+        "meta_len": len(cache.metadata),
+        "overlay_len": len(cache.overlay),
+        "assays": {k: len(v) for k, v in cache.assay_dfs.items()}
+    }
+
+
 

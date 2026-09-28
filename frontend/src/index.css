@@ -1043,6 +1043,47 @@ main { display: flex; flex-direction: column; overflow: hidden; background: var(
   box-shadow: 0 4px 14px rgba(177, 79, 196, 0.18);
 }
 
+.admin-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-sync-db {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #1E2859 0%, #2D3D82 100%);
+  border: 1px solid #1E2859;
+  color: #FFFFFF;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 12px rgba(30, 40, 89, 0.2);
+}
+.btn-sync-db:hover:not(:disabled) {
+  background: linear-gradient(135deg, #B14FC4 0%, #8E2FB2 100%);
+  border-color: #B14FC4;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(177, 79, 196, 0.35);
+}
+.btn-sync-db:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+.btn-sync-db .spinner-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
 .btn-secondary-lg {
   padding: 10px 20px;
   background: var(--s2);
@@ -1051,6 +1092,7 @@ main { display: flex; flex-direction: column; overflow: hidden; background: var(
   border-radius: var(--radius);
   font-weight: 600;
   font-size: 13px;
+  cursor: pointer;
   transition: all var(--transition);
 }
 .btn-secondary-lg:hover {
@@ -1084,6 +1126,10 @@ main { display: flex; flex-direction: column; overflow: hidden; background: var(
 .metric-trend.info {
   background: rgba(88, 166, 255, 0.15);
   color: var(--blue);
+}
+.metric-trend.success {
+  background: rgba(56, 161, 105, 0.15);
+  color: #38A169;
 }
 
 /* Toolbar */

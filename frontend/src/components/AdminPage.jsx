@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useStore } from '../store'
 
 export default function AdminPage() {
-  const { authFetch, setCurrentView, updateUser, user: currentUser } = useStore()
+  const { authFetch, setCurrentView, updateUser, user: currentUser, setStats } = useStore()
   const [activeTab, setActiveTab] = useState('users') // 'users' | 'whitelist' | 'audit'
 
   // Data state
@@ -10,6 +10,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [availableStudies, setAvailableStudies] = useState([])
+
+  // Database Sync state
+  const [syncingDb, setSyncingDb] = useState(false)
 
   // Form states
   const [newPattern, setNewPattern] = useState('')
@@ -28,6 +31,31 @@ export default function AdminPage() {
   // General UI state
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState({ type: '', text: '' })
+
+  const handleSyncDatabase = async () => {
+    setSyncingDb(true)
+    setMsg({ type: '', text: '' })
+    try {
+      const res = await authFetch('/api/admin/sync_database', {
+        method: 'POST',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || data.detail || 'Failed to synchronize database.')
+      
+      if (data.stats && setStats) {
+        setStats(data.stats)
+      }
+      setMsg({ 
+        type: 'success', 
+        text: `Database cache synchronized successfully from Supabase! (${data.meta_len || 0} Metadata Samples, ${data.overlay_len || 0} Overlay Rows, ${data.stats?.drugs || 0} Unique Drugs).` 
+      })
+      loadData()
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message || 'Failed to synchronize database.' })
+    } finally {
+      setSyncingDb(false)
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -208,6 +236,22 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="admin-hero-actions">
+          <button 
+            className="btn-sync-db" 
+            onClick={handleSyncDatabase} 
+            disabled={syncingDb}
+            title="Reload all assay, metadata, and overlay tables directly from Supabase Cloud into memory cache"
+          >
+            {syncingDb ? (
+              <>
+                <span className="spinner-sm"></span> Syncing Supabase...
+              </>
+            ) : (
+              <>
+                🔄 Sync Database
+              </>
+            )}
+          </button>
           <button className="btn-secondary-lg" onClick={() => setCurrentView('database')}>
             📊 Database Search Workspace
           </button>
@@ -279,6 +323,21 @@ export default function AdminPage() {
           </div>
           <div className="metric-val">{auditLogs.length}</div>
           <div className="metric-label">System Security Events</div>
+        </div>
+
+        <div 
+          className="metric-card actionable"
+          onClick={handleSyncDatabase}
+          title="Click to synchronize live database cache with Supabase Cloud"
+        >
+          <div className="metric-header">
+            <span className="metric-icon">⚡</span>
+            <span className="metric-trend success">{syncingDb ? 'Syncing...' : 'Connected'}</span>
+          </div>
+          <div className="metric-val" style={{ fontSize: '18px', padding: '4px 0' }}>
+            {syncingDb ? '⏳ Syncing...' : '🔄 Sync Now'}
+          </div>
+          <div className="metric-label">Supabase Cloud Cache</div>
         </div>
       </div>
 
