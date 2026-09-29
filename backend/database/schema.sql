@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS metadata (
     tumor_site VARCHAR(100),
     study VARCHAR(100),
     project_id VARCHAR(100),
-    hospital VARCHAR(100)
+    hospital VARCHAR(100),
+    "Platform_Response" VARCHAR(100) DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_meta_cancertype ON metadata(cancer_type);

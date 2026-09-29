@@ -273,6 +273,47 @@ main { display: flex; flex-direction: column; overflow: hidden; background: var(
   background: #F3E8FF; border-color: #D8B4FE; color: var(--accent); font-weight: 700;
 }
 
+/* ── Platform Response Badge ────────────────────────────────────────────── */
+.resp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.resp-pill.responder {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.resp-pill.non-responder {
+  background: rgba(239, 68, 68, 0.12);
+  color: #B91C1C;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.resp-pill.neutral {
+  background: var(--s2);
+  color: var(--txt);
+  border: 1px solid var(--bdr);
+}
+.resp-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.resp-dot.green {
+  background: #10B981;
+}
+.resp-dot.red {
+  background: #EF4444;
+}
+
 /* ── Expanded Row ──────────────────────────────────────────────────────── */
 .detail-row td { padding: 0; background: #F8FAFC !important; border-bottom: 2px solid var(--bdr); }
 .detail-inner { padding: 16px 20px 20px 40px; display: flex; flex-direction: column; gap: 18px; }

@@ -4,15 +4,15 @@ import { useStore } from '../store'
 import ExpandedRow from './ExpandedRow'
 
 const COLS = [
-  { key: 'toggle',       label: '',            w: 28   },
-  { key: 'Sample_ID',    label: 'Sample ID',   w: 130  },
-  { key: 'CancerType',   label: 'Indication',  w: 130  },
-  { key: 'Study',        label: 'Study Type',  w: 120  },
-
-  { key: 'TumorSite',    label: 'Tumor Site',  w: 110  },
-  { key: 'Gender',       label: 'Gender',      w: 70   },
-  { key: 'arms',         label: 'Treatment Details / Arms', w: 220 },
-  { key: 'assays',       label: 'Assays',      w: 180  },
+  { key: 'toggle',            label: '',                         w: 28  },
+  { key: 'Sample_ID',         label: 'Sample ID',                w: 130 },
+  { key: 'CancerType',        label: 'Indication',               w: 120 },
+  { key: 'Study',             label: 'Study Type',               w: 110 },
+  { key: 'TumorSite',         label: 'Tumor Site',               w: 110 },
+  { key: 'Gender',            label: 'Gender',                   w: 70  },
+  { key: 'arms',              label: 'Treatment Details / Arms', w: 200 },
+  { key: 'Platform_Response', label: 'Platform Response',        w: 150 },
+  { key: 'assays',            label: 'Assays',                   w: 180 },
 ]
 
 export default function ResultsTable() {
@@ -198,6 +198,30 @@ export default function ResultsTable() {
                           <span style={{ color: 'var(--muted)' }}>—</span>
                         )}
                       </div>
+                    </td>
+                    <td>
+                      {(() => {
+                        const resp = row.metadata?.Platform_Response || row.metadata?.['Platform Response'] || ''
+                        const respClean = String(resp).trim().toLowerCase()
+                        if (respClean === 'responder' || respClean === 'r') {
+                          return (
+                            <span className="resp-pill responder" title="Responder">
+                              <span className="resp-dot green"></span>
+                              <b>R</b> (Responder)
+                            </span>
+                          )
+                        } else if (respClean === 'non responder' || respClean === 'non-responder' || respClean === 'nr') {
+                          return (
+                            <span className="resp-pill non-responder" title="Non-responder">
+                              <span className="resp-dot red"></span>
+                              <b>NR</b> (Non-responder)
+                            </span>
+                          )
+                        } else if (resp) {
+                          return <span className="resp-pill neutral">{resp}</span>
+                        }
+                        return <span style={{ color: 'var(--muted)' }}>—</span>
+                      })()}
                     </td>
                     <td>
                       {(row.assays_present || []).map(a => (
