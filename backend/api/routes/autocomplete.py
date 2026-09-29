@@ -2,8 +2,9 @@
 Autocomplete endpoint — sub-20ms because it reads from in-memory cache.
 Supports multi-value prefix search: returns sorted unique matches.
 """
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from ..cache import cache
+from ..auth import get_current_whitelisted_user
 
 router = APIRouter()
 
@@ -20,13 +21,36 @@ FIELD_COL = {
 
 
 @router.get('/autocomplete')
-def autocomplete(q: str = '', field: str = 'drug', qualified_only: str = '', qualified: str = ''):
+def autocomplete(
+    q: str = '',
+    field: str = 'drug',
+    qualified_only: str = '',
+    qualified: str = '',
+    current_user: dict = Depends(get_current_whitelisted_user)
+):
     q = q.strip().lower()
     src, col = FIELD_COL.get(field, ('meta', 'Sample_ID'))
-    df = cache.overlay if src == 'overlay' else cache.metadata
+    df = (cache.overlay if src == 'overlay' else cache.metadata).copy()
 
     if col not in df.columns:
         return []
+
+    # RBAC Study Scoping
+    allowed_studies = current_user.get('allowed_studies', '*')
+    if allowed_studies != '*' and isinstance(allowed_studies, list):
+        if 'Study' in cache.metadata.columns and 'Sample_ID' in df.columns:
+            allowed_studies_lower = {s.strip().lower() for s in allowed_studies}
+            permitted_sids = set(cache.metadata[
+                cache.metadata['Study'].astype(str).str.strip().str.lower().isin(allowed_studies_lower)
+            ]['Sample_ID'])
+            df = df[df['Sample_ID'].isin(permitted_sids)]
+
+    # RBAC Sample Scoping
+    allowed_samples = current_user.get('allowed_samples', '*')
+    if allowed_samples != '*' and isinstance(allowed_samples, list):
+        if 'Sample_ID' in df.columns:
+            allowed_samples_lower = {s.strip().lower() for s in allowed_samples}
+            df = df[df['Sample_ID'].astype(str).str.strip().str.lower().isin(allowed_samples_lower)]
 
     is_qual = qualified_only.strip().lower() in ('true', '1', 'yes') or qualified.strip().lower() in ('true', '1', 'yes')
     if is_qual and 'qualified_sids' in cache.indexes:

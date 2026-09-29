@@ -53,7 +53,8 @@ def register(req: RegisterRequest):
         "full_name": req.full_name,
         "role": "user",
         "is_whitelisted": bool(whitelisted),
-        "allowed_studies": "*"
+        "allowed_studies": "*",
+        "allowed_samples": "*"
     }
 
     token = create_access_token({"sub": email_clean, "role": "user", "is_whitelisted": bool(whitelisted)})
@@ -96,6 +97,12 @@ def login(req: LoginRequest):
     else:
         allowed_studies = "*"
 
+    raw_samples = user_dict.get("allowed_samples", "*")
+    if raw_samples != "*" and isinstance(raw_samples, str):
+        allowed_samples = [s.strip() for s in raw_samples.split(",") if s.strip()]
+    else:
+        allowed_samples = "*"
+
     token_data = {
         "sub": email_clean,
         "id": user_dict["id"],
@@ -113,7 +120,8 @@ def login(req: LoginRequest):
             "full_name": user_dict["full_name"],
             "role": user_dict["role"],
             "is_whitelisted": bool(is_whitelisted),
-            "allowed_studies": allowed_studies
+            "allowed_studies": allowed_studies,
+            "allowed_samples": allowed_samples
         }
     }
 

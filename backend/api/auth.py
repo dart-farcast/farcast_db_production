@@ -70,7 +70,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, email, full_name, role, is_whitelisted, allowed_studies FROM users WHERE email = ?", (email,))
+        cursor.execute("SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples FROM users WHERE email = ?", (email,))
         user = cursor.fetchone()
         if not user:
             raise HTTPException(status_code=401, detail="User account not found.")
@@ -82,6 +82,13 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
             user_dict['allowed_studies'] = [s.strip() for s in raw_studies.split(',') if s.strip()]
         else:
             user_dict['allowed_studies'] = '*'
+
+        # Parse allowed_samples
+        raw_samples = user_dict.get('allowed_samples', '*')
+        if raw_samples != '*' and isinstance(raw_samples, str):
+            user_dict['allowed_samples'] = [s.strip() for s in raw_samples.split(',') if s.strip()]
+        else:
+            user_dict['allowed_samples'] = '*'
 
         # Re-check whitelist dynamically
         if not user_dict['is_whitelisted'] and is_email_whitelisted(user_dict['email']):

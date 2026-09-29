@@ -7,7 +7,7 @@ Fixes vs v1:
   - Indication/study/site/project: use partial matching (so "HNSCC" matches "HNSCC")
   - Multi-filter: proper AND intersection across all fields
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
 from ..cache import cache
@@ -130,11 +130,16 @@ def search(
     if is_qual:
         final_sids &= idx.get('qualified_sids', set())
 
-    # ── 0. Mandatory User Study Scoping ──────────────────────────────────────
+    # ── 0. Mandatory User Study Scoping & Sample Scoping ────────────────────────
     allowed_studies = current_user.get('allowed_studies', '*')
     if allowed_studies != '*' and isinstance(allowed_studies, list):
         scoped_sids = _index_match(idx['study'], allowed_studies, partial=False)
         final_sids &= scoped_sids
+
+    allowed_samples = current_user.get('allowed_samples', '*')
+    if allowed_samples != '*' and isinstance(allowed_samples, list):
+        scoped_sample_sids = {s.strip().upper() for s in allowed_samples if s.strip()}
+        final_sids = {sid for sid in final_sids if sid.strip().upper() in scoped_sample_sids}
 
 
     # ── 1. Assay pre-filter: samples must be present in ALL selected assays (AND) ──
@@ -281,11 +286,27 @@ def sample_assays(
     sample_id:   str = '',
     strict_drug: str = '',
     drug:        str = '',
+    current_user: dict = Depends(get_current_whitelisted_user),
 ):
     """Return all assay rows for one sample across every assay type (with optional strict drug + control arm filter)."""
     if not sample_id:
         return {}
     sid = sample_id.strip()
+
+    # RBAC Enforcement: Check sample-wise and study-wise permission
+    allowed_samples = current_user.get('allowed_samples', '*')
+    if allowed_samples != '*' and isinstance(allowed_samples, list):
+        allowed_sample_set = {s.strip().upper() for s in allowed_samples if s.strip()}
+        if sid.upper() not in allowed_sample_set:
+            raise HTTPException(status_code=403, detail="Access denied: You do not have permission to view this sample.")
+
+    allowed_studies = current_user.get('allowed_studies', '*')
+    if allowed_studies != '*' and isinstance(allowed_studies, list):
+        meta_row = cache.meta_idx.get(sid)
+        study_val = meta_row.get('Study', '') or meta_row.get('RegisterType', '') if meta_row else ''
+        if study_val and not any(s.strip().lower() == str(study_val).strip().lower() for s in allowed_studies):
+            raise HTTPException(status_code=403, detail="Access denied: You do not have permission to view samples from this study.")
+
     is_strict = strict_drug.strip().lower() in ('true', '1', 'yes') and bool(drug)
     drugs = _parse_multi(drug) if is_strict else []
 
@@ -322,13 +343,38 @@ class CohortRequest(BaseModel):
 
 
 @router.post('/cohort_assays')
-def cohort_assays(req: CohortRequest):
+def cohort_assays(
+    req: CohortRequest,
+    current_user: dict = Depends(get_current_whitelisted_user),
+):
     """Return all assay rows for multiple samples across every assay type (with strict drug + control arm filtering support)."""
     if not req.sample_ids:
         return {}
     sids = {sid.strip() for sid in req.sample_ids if sid.strip()}
     if not sids:
         return {}
+
+    # RBAC Sample-wise filtering
+    allowed_samples = current_user.get('allowed_samples', '*')
+    if allowed_samples != '*' and isinstance(allowed_samples, list):
+        allowed_sample_set = {s.strip().upper() for s in allowed_samples if s.strip()}
+        sids = {s for s in sids if s.upper() in allowed_sample_set}
+        if not sids:
+            return {}
+
+    # RBAC Study-wise filtering
+    allowed_studies = current_user.get('allowed_studies', '*')
+    if allowed_studies != '*' and isinstance(allowed_studies, list):
+        allowed_studies_lower = {s.strip().lower() for s in allowed_studies if s.strip()}
+        valid_sids = set()
+        for sid in sids:
+            meta_row = cache.meta_idx.get(sid)
+            study_val = meta_row.get('Study', '') or meta_row.get('RegisterType', '') if meta_row else ''
+            if not study_val or str(study_val).strip().lower() in allowed_studies_lower:
+                valid_sids.add(sid)
+        sids = valid_sids
+        if not sids:
+            return {}
 
     strict_pairs = set()
     if req.strict_drug and req.drugs:

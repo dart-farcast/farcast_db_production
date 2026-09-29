@@ -23,10 +23,12 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'approved' | 'scoped'
 
-  // Modal State for Study Permissions
+  // Modal State for Study & Sample Permissions
   const [editingUser, setEditingUser] = useState(null)
   const [selectedStudies, setSelectedStudies] = useState([])
-  const [isUnrestricted, setIsUnrestricted] = useState(true)
+  const [isUnrestrictedStudies, setIsUnrestrictedStudies] = useState(true)
+  const [isUnrestrictedSamples, setIsUnrestrictedSamples] = useState(true)
+  const [sampleInputText, setSampleInputText] = useState('')
 
   // General UI state
   const [loading, setLoading] = useState(false)
@@ -171,15 +173,23 @@ export default function AdminPage() {
     }
   }
 
-  // Open modal for editing study access
-  const openStudyModal = (user) => {
+  // Open modal for editing study & sample access
+  const openPermissionsModal = (user) => {
     setEditingUser(user)
     if (user.allowed_studies === '*' || !Array.isArray(user.allowed_studies)) {
-      setIsUnrestricted(true)
+      setIsUnrestrictedStudies(true)
       setSelectedStudies(availableStudies)
     } else {
-      setIsUnrestricted(false)
+      setIsUnrestrictedStudies(false)
       setSelectedStudies(user.allowed_studies)
+    }
+
+    if (user.allowed_samples === '*' || !Array.isArray(user.allowed_samples)) {
+      setIsUnrestrictedSamples(true)
+      setSampleInputText('')
+    } else {
+      setIsUnrestrictedSamples(false)
+      setSampleInputText(user.allowed_samples.join(', '))
     }
   }
 
@@ -189,11 +199,36 @@ export default function AdminPage() {
     )
   }
 
-  const handleSaveStudyPermissions = async () => {
+  const handleSavePermissions = async () => {
     if (!editingUser) return
-    const payload = {
-      allowed_studies: isUnrestricted ? '*' : selectedStudies
+
+    let finalSamples = '*'
+    if (!isUnrestrictedSamples) {
+      const parsed = sampleInputText
+        .split(/[\s,]+/)
+        .map(s => s.trim().toUpperCase())
+        .filter(Boolean)
+      finalSamples = Array.from(new Set(parsed))
+      if (finalSamples.length === 0) {
+        setMsg({ type: 'error', text: 'Please specify at least one valid Sample ID or select Unrestricted Samples.' })
+        return
+      }
     }
+
+    let finalStudies = '*'
+    if (!isUnrestrictedStudies) {
+      if (selectedStudies.length === 0) {
+        setMsg({ type: 'error', text: 'Please select at least one study or select Unrestricted Studies.' })
+        return
+      }
+      finalStudies = selectedStudies
+    }
+
+    const payload = {
+      allowed_studies: finalStudies,
+      allowed_samples: finalSamples
+    }
+
     const success = await handleUserUpdate(editingUser.id, payload)
     if (success) {
       setEditingUser(null)
@@ -212,7 +247,8 @@ export default function AdminPage() {
       statusFilter === 'all' ? true :
       statusFilter === 'pending' ? !u.is_whitelisted :
       statusFilter === 'approved' ? u.is_whitelisted :
-      statusFilter === 'scoped' ? (u.allowed_studies !== '*' && Array.isArray(u.allowed_studies)) : true
+      statusFilter === 'study_scoped' ? (u.allowed_studies !== '*' && Array.isArray(u.allowed_studies)) :
+      statusFilter === 'sample_scoped' ? (u.allowed_samples !== '*' && Array.isArray(u.allowed_samples)) : true
 
     return matchesSearch && matchesRole && matchesStatus
   })
@@ -220,7 +256,8 @@ export default function AdminPage() {
   // Metrics
   const pendingCount = users.filter(u => !u.is_whitelisted).length
   const adminCount = users.filter(u => u.role === 'role' || u.role === 'admin').length
-  const scopedUserCount = users.filter(u => u.allowed_studies !== '*' && Array.isArray(u.allowed_studies)).length
+  const studyScopedCount = users.filter(u => u.allowed_studies !== '*' && Array.isArray(u.allowed_studies)).length
+  const sampleScopedCount = users.filter(u => u.allowed_samples !== '*' && Array.isArray(u.allowed_samples)).length
 
   return (
     <div className="admin-container">
@@ -287,16 +324,29 @@ export default function AdminPage() {
         </div>
 
         <div 
-          className={`metric-card actionable ${activeTab === 'users' && statusFilter === 'scoped' ? 'active-card' : ''}`}
-          onClick={() => { setActiveTab('users'); setStatusFilter('scoped'); setRoleFilter('all'); setUserSearch(''); }}
+          className={`metric-card actionable ${activeTab === 'users' && statusFilter === 'study_scoped' ? 'active-card' : ''}`}
+          onClick={() => { setActiveTab('users'); setStatusFilter('study_scoped'); setRoleFilter('all'); setUserSearch(''); }}
           title="Click to view study-scoped users"
         >
           <div className="metric-header">
             <span className="metric-icon">🔒</span>
             <span className="metric-trend info">RBAC</span>
           </div>
-          <div className="metric-val">{scopedUserCount}</div>
+          <div className="metric-val">{studyScopedCount}</div>
           <div className="metric-label">Study-Scoped Users</div>
+        </div>
+
+        <div 
+          className={`metric-card actionable ${activeTab === 'users' && statusFilter === 'sample_scoped' ? 'active-card' : ''}`}
+          onClick={() => { setActiveTab('users'); setStatusFilter('sample_scoped'); setRoleFilter('all'); setUserSearch(''); }}
+          title="Click to view sample-scoped users"
+        >
+          <div className="metric-header">
+            <span className="metric-icon">🎯</span>
+            <span className="metric-trend warning">RBAC</span>
+          </div>
+          <div className="metric-val">{sampleScopedCount}</div>
+          <div className="metric-label">Sample-Scoped Users</div>
         </div>
 
         <div 
@@ -355,7 +405,7 @@ export default function AdminPage() {
           className={`subtab-btn ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
-          👥 User Directory & Study Access ({users.length}) {pendingCount > 0 && <span className="badge-pending">{pendingCount}</span>}
+          👥 User Directory & RBAC ({users.length}) {pendingCount > 0 && <span className="badge-pending">{pendingCount}</span>}
         </button>
         <button 
           className={`subtab-btn ${activeTab === 'whitelist' ? 'active' : ''}`}
@@ -371,7 +421,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* TAB 1: User Directory & Study Access Control */}
+      {/* TAB 1: User Directory & Access Control */}
       {activeTab === 'users' && (
         <div className="admin-section">
           <div className="admin-toolbar">
@@ -388,9 +438,10 @@ export default function AdminPage() {
               <label>Status:</label>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">All Statuses</option>
-                <option value="pending">Pending Approval</option>
-                <option value="approved">Approved Whitelist</option>
-                <option value="scoped">Study Scoped</option>
+                <option value="pending">⏳ Pending Approval ({pendingCount})</option>
+                <option value="approved">✅ Approved</option>
+                <option value="study_scoped">🔒 Study-Scoped ({studyScopedCount})</option>
+                <option value="sample_scoped">🎯 Sample-Scoped ({sampleScopedCount})</option>
               </select>
             </div>
             <div className="filter-group">
@@ -410,15 +461,18 @@ export default function AdminPage() {
                   <th>User Profile</th>
                   <th>Role</th>
                   <th>Account Status</th>
-                  <th>Study Access Scope</th>
+                  <th>Study Access</th>
+                  <th>Sample Access Scope</th>
                   <th>Created At</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.map((u) => {
-                  const isUnrestrictedUser = u.allowed_studies === '*' || !Array.isArray(u.allowed_studies)
-                  const studyCount = isUnrestrictedUser ? availableStudies.length : u.allowed_studies.length
+                  const isUnrestrictedUserStudies = u.allowed_studies === '*' || !Array.isArray(u.allowed_studies)
+                  const studyCount = isUnrestrictedUserStudies ? availableStudies.length : u.allowed_studies.length
+                  const isUnrestrictedUserSamples = u.allowed_samples === '*' || !Array.isArray(u.allowed_samples)
+                  const sampleCount = isUnrestrictedUserSamples ? 0 : u.allowed_samples.length
 
                   return (
                     <tr key={u.id}>
@@ -445,21 +499,37 @@ export default function AdminPage() {
                       </td>
                       <td>
                         <div className="study-scope-cell">
-                          {isUnrestrictedUser ? (
+                          {isUnrestrictedUserStudies ? (
                             <span className="scope-badge unrestricted">
                               🌐 All Studies ({availableStudies.length})
                             </span>
                           ) : (
                             <span className="scope-badge scoped" title={u.allowed_studies.join(', ')}>
-                              🔒 {studyCount} Stud{studyCount === 1 ? 'y' : 'ies'} Scoped
+                              🔒 {studyCount} Stud{studyCount === 1 ? 'y' : 'ies'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="study-scope-cell">
+                          {isUnrestrictedUserSamples ? (
+                            <span className="scope-badge unrestricted">
+                              🌐 All Samples
+                            </span>
+                          ) : (
+                            <span 
+                              className="scope-badge sample-scoped" 
+                              title={u.allowed_samples.slice(0, 30).join(', ') + (u.allowed_samples.length > 30 ? '...' : '')}
+                            >
+                              🎯 {sampleCount} Sample{sampleCount === 1 ? '' : 's'}
                             </span>
                           )}
                           <button 
                             className="btn-scope-edit" 
-                            onClick={() => openStudyModal(u)}
-                            title="Configure Study-Level Data Permissions"
+                            onClick={() => openPermissionsModal(u)}
+                            title="Configure Study & Sample-Wise Permissions"
                           >
-                            ⚙️ Edit Scope
+                            ⚙️ Permissions
                           </button>
                         </div>
                       </td>
@@ -611,79 +681,177 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* STUDY ACCESS MODAL */}
+      {/* STUDY & SAMPLE ACCESS RBAC MODAL */}
       {editingUser && (
         <div className="modal-backdrop" onClick={() => setEditingUser(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card rbac-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h3>🔒 Configure Study Data Permissions</h3>
-                <span className="modal-subtitle">User: <b>{editingUser.email}</b></span>
+                <h3>🛡️ Configure Data Access & RBAC Permissions</h3>
+                <span className="modal-subtitle">User: <b>{editingUser.email}</b> ({editingUser.full_name || 'Unnamed'})</span>
               </div>
               <button className="modal-close-btn" onClick={() => setEditingUser(null)}>✕</button>
             </div>
 
             <div className="modal-body">
-              <div className="access-toggle-box">
-                <label className={`toggle-option ${isUnrestricted ? 'active' : ''}`}>
-                  <input 
-                    type="radio" 
-                    name="accessMode" 
-                    checked={isUnrestricted}
-                    onChange={() => setIsUnrestricted(true)}
-                  />
-                  <div>
-                    <strong>🌐 Unrestricted Access (All Studies)</strong>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
-                      User can query, view, and search across all present and future dataset studies.
-                    </p>
-                  </div>
-                </label>
+              {/* SECTION 1: Study Permissions */}
+              <div className="rbac-section-block">
+                <div className="rbac-section-title">
+                  <span>📂 1. Study-Level Data Scope</span>
+                </div>
+                <div className="access-toggle-box">
+                  <label className={`toggle-option ${isUnrestrictedStudies ? 'active' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="studyAccessMode" 
+                      checked={isUnrestrictedStudies}
+                      onChange={() => setIsUnrestrictedStudies(true)}
+                    />
+                    <div>
+                      <strong>🌐 Unrestricted Access (All Studies)</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        User can query and view data across all studies (Biopharma, Internal R&D).
+                      </p>
+                    </div>
+                  </label>
 
-                <label className={`toggle-option ${!isUnrestricted ? 'active' : ''}`}>
-                  <input 
-                    type="radio" 
-                    name="accessMode" 
-                    checked={!isUnrestricted}
-                    onChange={() => setIsUnrestricted(false)}
-                  />
-                  <div>
-                    <strong>🔒 Restricted Study Access</strong>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
-                      Explicitly restrict user to only see data belonging to selected studies below.
-                    </p>
+                  <label className={`toggle-option ${!isUnrestrictedStudies ? 'active' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="studyAccessMode" 
+                      checked={!isUnrestrictedStudies}
+                      onChange={() => setIsUnrestrictedStudies(false)}
+                    />
+                    <div>
+                      <strong>🔒 Restricted Study Access</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        Explicitly limit user to only see data belonging to checked studies below.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {!isUnrestrictedStudies && (
+                  <div className="study-checkbox-grid">
+                    <span className="section-label">Select Permitted Studies:</span>
+                    <div className="checkboxes-wrapper">
+                      {availableStudies.map((study) => {
+                        const checked = selectedStudies.includes(study)
+                        return (
+                          <label key={study} className={`study-chip ${checked ? 'selected' : ''}`}>
+                            <input 
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleStudySelection(study)}
+                            />
+                            <span>{study}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
                   </div>
-                </label>
+                )}
               </div>
 
-              {!isUnrestricted && (
-                <div className="study-checkbox-grid">
-                  <span className="section-label">Select Permitted Studies:</span>
-                  <div className="checkboxes-wrapper">
-                    {availableStudies.map((study) => {
-                      const checked = selectedStudies.includes(study)
-                      return (
-                        <label key={study} className={`study-chip ${checked ? 'selected' : ''}`}>
-                          <input 
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleStudySelection(study)}
-                          />
-                          <span>{study}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
+              {/* SECTION 2: Sample-Wise Permissions */}
+              <div className="rbac-section-block" style={{ marginTop: '20px' }}>
+                <div className="rbac-section-title">
+                  <span>🎯 2. Sample-Wise Access Scope</span>
                 </div>
-              )}
+                <div className="access-toggle-box">
+                  <label className={`toggle-option ${isUnrestrictedSamples ? 'active' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="sampleAccessMode" 
+                      checked={isUnrestrictedSamples}
+                      onChange={() => setIsUnrestrictedSamples(true)}
+                    />
+                    <div>
+                      <strong>🌐 Unrestricted Samples (All Samples)</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        User can view all sample IDs within their permitted studies.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className={`toggle-option ${!isUnrestrictedSamples ? 'active' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="sampleAccessMode" 
+                      checked={!isUnrestrictedSamples}
+                      onChange={() => setIsUnrestrictedSamples(false)}
+                    />
+                    <div>
+                      <strong>🎯 Specific Sample IDs Only</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        Strictly limit user to view and search ONLY the sample IDs specified below.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {!isUnrestrictedSamples && (
+                  <div className="sample-input-box">
+                    <div className="sample-input-header">
+                      <span className="section-label">Enter or Paste Allowed Sample IDs:</span>
+                      <div className="sample-quick-actions">
+                        <button 
+                          type="button" 
+                          className="btn-link-action"
+                          onClick={() => setSampleInputText('')}
+                        >
+                          🧹 Clear
+                        </button>
+                        <button 
+                          type="button" 
+                          className="btn-link-action"
+                          onClick={() => {
+                            const parsed = sampleInputText
+                              .split(/[\s,]+/)
+                              .map(s => s.trim().toUpperCase())
+                              .filter(Boolean)
+                            setSampleInputText(Array.from(new Set(parsed)).join(', '))
+                          }}
+                        >
+                          ✨ Format & Deduplicate
+                        </button>
+                      </div>
+                    </div>
+                    <textarea 
+                      className="sample-textarea"
+                      rows={4}
+                      placeholder="e.g. FBR1A210009, FBR1A210010, FBR1A210016, FBR2O240350... (comma, space, or line separated)"
+                      value={sampleInputText}
+                      onChange={(e) => setSampleInputText(e.target.value)}
+                    />
+                    {(() => {
+                      const parsed = sampleInputText
+                        .split(/[\s,]+/)
+                        .map(s => s.trim().toUpperCase())
+                        .filter(Boolean)
+                      const uniqueCount = new Set(parsed).size
+                      return (
+                        <div className="sample-count-badge">
+                          <span>🎯 <b>{uniqueCount}</b> Unique Sample{uniqueCount === 1 ? '' : 's'} Configured</span>
+                          {uniqueCount > 0 && (
+                            <span className="sample-preview-list">
+                              Preview: {Array.from(new Set(parsed)).slice(0, 5).join(', ')}{uniqueCount > 5 ? ` +${uniqueCount - 5} more` : ''}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setEditingUser(null)}>
                 Cancel
               </button>
-              <button className="btn-primary" onClick={handleSaveStudyPermissions}>
-                Save Study Permissions
+              <button className="btn-primary" onClick={handleSavePermissions}>
+                Save Permissions
               </button>
             </div>
           </div>

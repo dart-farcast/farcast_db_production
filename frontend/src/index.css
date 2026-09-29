@@ -1234,6 +1234,11 @@ main { display: flex; flex-direction: column; overflow: hidden; background: var(
   color: #0369A1;
   border: 1px solid rgba(88, 166, 255, 0.4);
 }
+.scope-badge.sample-scoped {
+  background: rgba(168, 85, 247, 0.12);
+  color: #7E22CE;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
 .btn-scope-edit {
   display: inline-flex;
   align-items: center;
@@ -1417,6 +1422,114 @@ main { display: flex; flex-direction: column; overflow: hidden; background: var(
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* ── Dual RBAC Permission Modal ── */
+.rbac-modal-card {
+  max-width: 680px;
+}
+.rbac-modal-body {
+  max-height: 72vh;
+  gap: 24px;
+}
+.rbac-section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  padding: 16px;
+}
+.rbac-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.rbac-section-icon {
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px;
+  background: #F1F5F9;
+  border-radius: 6px;
+}
+.rbac-section-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rbac-section-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.sample-input-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  background: #F8FAFC;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  padding: 12px;
+}
+.sample-input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sample-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7E22CE;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.sample-input-actions {
+  display: flex;
+  gap: 12px;
+}
+.btn-link-action {
+  background: none;
+  border: none;
+  color: #2563EB;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.btn-link-action:hover {
+  color: #1D4ED8;
+}
+.btn-link-action.text-danger {
+  color: #DC2626;
+}
+.btn-link-action.text-danger:hover {
+  color: #B91C1C;
+}
+.sample-textarea {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+  background: #FFFFFF;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  color: var(--txt);
+  resize: vertical;
+}
+.sample-textarea:focus {
+  outline: none;
+  border-color: #7E22CE;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+.sample-input-hint {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* ── Qualification Status Toggle Switch ─────────────────────────────────── */

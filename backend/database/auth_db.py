@@ -55,10 +55,18 @@ def init_auth_db():
                 role TEXT NOT NULL DEFAULT 'user',
                 is_whitelisted INTEGER NOT NULL DEFAULT 0,
                 allowed_studies TEXT NOT NULL DEFAULT '*',
+                allowed_samples TEXT NOT NULL DEFAULT '*',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP
             )
         """)
+        
+        # Safeguard for allowed_samples column migration
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN allowed_samples TEXT NOT NULL DEFAULT '*'")
+            db.commit()
+        except Exception:
+            pass
         
         # Whitelisted emails table
         cursor.execute("""

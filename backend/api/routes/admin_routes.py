@@ -14,6 +14,7 @@ class UpdateUserRequest(BaseModel):
     role: Optional[str] = None
     is_whitelisted: Optional[bool] = None
     allowed_studies: Optional[Union[List[str], str]] = None
+    allowed_samples: Optional[Union[List[str], str]] = None
 
 def log_audit(actor_email: str, action: str, details: str):
     try:
@@ -110,7 +111,7 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, email, full_name, role, is_whitelisted, allowed_studies, created_at, last_login
+            SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples, created_at, last_login
             FROM users
             ORDER BY id ASC
         """)
@@ -125,6 +126,12 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
         else:
             allowed_studies = "*"
 
+        raw_samples = u_dict.get("allowed_samples", "*")
+        if raw_samples != "*" and isinstance(raw_samples, str):
+            allowed_samples = [s.strip() for s in raw_samples.split(",") if s.strip()]
+        else:
+            allowed_samples = "*"
+
         user_list.append({
             "id": u_dict["id"],
             "email": u_dict["email"],
@@ -132,6 +139,7 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
             "role": u_dict["role"],
             "is_whitelisted": bool(u_dict["is_whitelisted"]),
             "allowed_studies": allowed_studies,
+            "allowed_samples": allowed_samples,
             "created_at": u_dict["created_at"],
             "last_login": u_dict["last_login"]
         })
@@ -145,7 +153,7 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
 def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depends(get_current_admin_user)):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, email, role, is_whitelisted, allowed_studies FROM users WHERE id = ?", (user_id,))
+        cursor.execute("SELECT id, email, role, is_whitelisted, allowed_studies, allowed_samples FROM users WHERE id = ?", (user_id,))
         target_user = cursor.fetchone()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found.")
@@ -173,6 +181,17 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
             updates.append("allowed_studies = ?")
             params.append(val)
 
+        if req.allowed_samples is not None:
+            if isinstance(req.allowed_samples, list):
+                if '*' in req.allowed_samples or len(req.allowed_samples) == 0:
+                    val = '*'
+                else:
+                    val = ','.join([s.strip() for s in req.allowed_samples if s.strip()])
+            else:
+                val = str(req.allowed_samples).strip()
+            updates.append("allowed_samples = ?")
+            params.append(val)
+
         if not updates:
             raise HTTPException(status_code=400, detail="No valid update fields provided.")
 
@@ -181,7 +200,7 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
         conn.commit()
 
     log_audit(current_admin["email"], "UPDATE_USER", 
-              f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, whitelisted={req.is_whitelisted}, allowed_studies={req.allowed_studies}")
+              f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, whitelisted={req.is_whitelisted}, allowed_studies={req.allowed_studies}, allowed_samples={req.allowed_samples}")
 
     return {
         "success": True,
