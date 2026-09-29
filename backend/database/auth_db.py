@@ -63,10 +63,16 @@ def init_auth_db():
         
         # Safeguard for allowed_samples column migration
         try:
-            cursor.execute("ALTER TABLE users ADD COLUMN allowed_samples TEXT NOT NULL DEFAULT '*'")
+            if getattr(db, 'is_postgres', False):
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_samples TEXT NOT NULL DEFAULT '*'")
+            else:
+                cursor.execute("PRAGMA table_info(users)")
+                cols = [col['name'] for col in cursor.fetchall()]
+                if 'allowed_samples' not in cols:
+                    cursor.execute("ALTER TABLE users ADD COLUMN allowed_samples TEXT NOT NULL DEFAULT '*'")
             db.commit()
         except Exception:
-            pass
+            db.rollback()
         
         # Whitelisted emails table
         cursor.execute("""
@@ -107,8 +113,8 @@ def init_auth_db():
         if not row_user or row_user['cnt'] == 0:
             hashed_pw = hash_password("admin123")
             cursor.execute("""
-                INSERT INTO users (email, full_name, password_hash, role, is_whitelisted, allowed_studies)
-                VALUES (?, ?, ?, ?, TRUE, '*')
+                INSERT INTO users (email, full_name, password_hash, role, is_whitelisted, allowed_studies, allowed_samples)
+                VALUES (?, ?, ?, ?, TRUE, '*', '*')
             """, ("admin@farcastbio.com", "Default Admin", hashed_pw, "admin"))
             db.commit()
             print("  [Auth DB] Initialized auth database with default admin: admin@farcastbio.com / admin123")
