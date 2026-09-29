@@ -59,15 +59,35 @@ def debug():
     }
 
 @router.get('/assay_types')
-def assay_types():
+def assay_types(current_user: dict = Depends(get_current_whitelisted_user)):
+    allowed_studies = current_user.get('allowed_studies', '*')
+    allowed_samples = current_user.get('allowed_samples', '*')
+    
+    scoped_sids = None
+    if allowed_studies != '*' or allowed_samples != '*':
+        meta_scoped = cache.metadata.copy()
+        if allowed_studies != '*' and isinstance(allowed_studies, list):
+            study_col = 'Study' if 'Study' in cache.metadata.columns else ('RegisterType' if 'RegisterType' in cache.metadata.columns else None)
+            if study_col:
+                allowed_set = {s.strip().lower() for s in allowed_studies}
+                meta_scoped = meta_scoped[meta_scoped[study_col].astype(str).str.strip().str.lower().isin(allowed_set)]
+        if allowed_samples != '*' and isinstance(allowed_samples, list):
+            sample_set = {s.strip().lower() for s in allowed_samples}
+            meta_scoped = meta_scoped[meta_scoped['Sample_ID'].astype(str).str.strip().str.lower().isin(sample_set)]
+        scoped_sids = set(meta_scoped['Sample_ID'].astype(str).str.strip().dropna())
+
     out = []
     for name, df in cache.assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
         arm_col = find_col(df, ARM_ALIASES)
+        if scoped_sids is not None and sid_col and sid_col in df.columns:
+            rows = int(df[df[sid_col].astype(str).str.strip().isin(scoped_sids)].shape[0])
+        else:
+            rows = len(df) if df is not None else 0
         out.append({
             'name':    name,
             'columns': list(df.columns),
-            'rows':    len(df),
+            'rows':    rows,
             'sid_col': sid_col,
             'arm_col': arm_col,
         })

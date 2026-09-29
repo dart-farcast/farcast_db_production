@@ -177,10 +177,18 @@ def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict) ->
                    if 'CancerType' in meta.columns else {})
     study_list = (sorted(meta[study_col].replace('', pd.NA).dropna().unique().tolist())
                   if study_col else [])
+    scoped_sids = set(meta['Sample_ID'].astype(str).str.strip().dropna()) if not meta.empty and 'Sample_ID' in meta.columns else None
     a_samples = {}
     for name, df in assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)
-        a_samples[name] = int(df[sid_col].replace('', pd.NA).dropna().nunique()) if sid_col and sid_col in df.columns else 0
+        if sid_col and sid_col in df.columns:
+            sids_series = df[sid_col].astype(str).str.strip().replace('', pd.NA).dropna()
+            if scoped_sids is not None:
+                a_samples[name] = int(sids_series[sids_series.isin(scoped_sids)].nunique())
+            else:
+                a_samples[name] = int(sids_series.nunique())
+        else:
+            a_samples[name] = 0
 
     total_samples = int(meta['Sample_ID'].nunique()) if not meta.empty and 'Sample_ID' in meta.columns else 0
 
