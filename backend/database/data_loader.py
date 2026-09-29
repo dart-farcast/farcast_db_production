@@ -170,14 +170,14 @@ def build_assay_presence_map(assay_dfs: dict) -> dict:
     return presence
 
 
-def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict) -> dict:
+def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict, is_scoped: bool = False) -> dict:
     drugs     = overlay['Drug'].replace('', pd.NA).dropna() if not overlay.empty and 'Drug' in overlay.columns else pd.Series(dtype=object)
     study_col = 'Study' if 'Study' in meta.columns else ('RegisterType' if 'RegisterType' in meta.columns else None)
     indications = (meta['CancerType'].replace('', pd.NA).dropna().value_counts().to_dict()
                    if 'CancerType' in meta.columns else {})
     study_list = (sorted(meta[study_col].replace('', pd.NA).dropna().unique().tolist())
                   if study_col else [])
-    scoped_sids = set(meta['Sample_ID'].astype(str).str.strip().dropna()) if not meta.empty and 'Sample_ID' in meta.columns else None
+    scoped_sids = set(meta['Sample_ID'].astype(str).str.strip().dropna()) if (is_scoped and not meta.empty and 'Sample_ID' in meta.columns) else None
     a_samples = {}
     for name, df in assay_dfs.items():
         sid_col = find_col(df, SID_ALIASES)

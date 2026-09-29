@@ -44,7 +44,7 @@ def stats(current_user: dict = Depends(get_current_whitelisted_user)):
 
     scoped_sids = set(meta_scoped['Sample_ID'])
     overlay_scoped = cache.overlay[cache.overlay['Sample_ID'].isin(scoped_sids)]
-    return compute_stats(meta_scoped, overlay_scoped, cache.assay_dfs)
+    return compute_stats(meta_scoped, overlay_scoped, cache.assay_dfs, is_scoped=True)
 
 
 
