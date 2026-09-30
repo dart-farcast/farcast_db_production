@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.cache import lifespan
-from api.routes import stats, autocomplete, search, upload, auth_routes, admin_routes
+from api.routes import stats, autocomplete, search, upload, auth_routes, admin_routes, pre_reboot_routes
 from api.auth import get_current_whitelisted_user
 
 app = FastAPI(title='FarCast DB v2', lifespan=lifespan)
@@ -89,6 +89,7 @@ app.include_router(stats.router,        prefix='/api', dependencies=[Depends(get
 app.include_router(autocomplete.router, prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
 app.include_router(search.router,       prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
 app.include_router(upload.router,       prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
+app.include_router(pre_reboot_routes.router, prefix='/api', dependencies=[Depends(get_current_whitelisted_user)])
 
 @app.get('/api/hardcode')
 def hardcode():

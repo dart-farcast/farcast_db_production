@@ -32,6 +32,35 @@ function buildQS(filters) {
 }
 
 
+const DEFAULT_PRE_REBOOT_FILTERS = {
+  mbt: '',
+  main_cancer_type: [],
+  cancer_type: [],
+  primary_study: [],
+  hospital: [],
+  year: [],
+  ffpe_block: false,
+  scored_only: false,
+}
+
+function buildPreRebootQS(filters, page = 0, pageSize = 50, sortCol = 'mbt', sortAsc = true) {
+  const p = new URLSearchParams()
+  const arr = (k, v) => { if (v?.length) p.set(k, v.join(',')) }
+  if (filters.mbt) p.set('mbt', filters.mbt)
+  arr('main_cancer_type', filters.main_cancer_type)
+  arr('cancer_type', filters.cancer_type)
+  arr('primary_study', filters.primary_study)
+  arr('hospital', filters.hospital)
+  arr('year', filters.year)
+  if (filters.ffpe_block) p.set('ffpe_block', 'true')
+  if (filters.scored_only) p.set('scored_only', 'true')
+  p.set('page', page)
+  p.set('page_size', pageSize)
+  p.set('sort_col', sortCol)
+  p.set('sort_asc', sortAsc ? 'true' : 'false')
+  return p.toString()
+}
+
 const savedToken = localStorage.getItem('farcast_token') || null
 let savedUser = null
 try {
@@ -44,7 +73,7 @@ export const useStore = create((set, get) => ({
   // Auth state
   token: savedToken,
   user: savedUser,
-  currentView: savedToken && savedUser?.is_whitelisted ? 'database' : 'login', // 'database' | 'admin' | 'login'
+  currentView: savedToken && savedUser?.is_whitelisted ? 'hub' : 'login', // 'hub' | 'database' | 'pre_reboot' | 'admin' | 'login'
   authError: null,
 
   setAuth: (user, token) => {
@@ -53,7 +82,7 @@ export const useStore = create((set, get) => ({
     set({
       user,
       token,
-      currentView: user?.is_whitelisted ? 'database' : 'login',
+      currentView: user?.is_whitelisted ? 'hub' : 'login',
       authError: null
     })
   },
@@ -73,7 +102,10 @@ export const useStore = create((set, get) => ({
       currentView: 'login',
       results: [],
       total: 0,
-      filters: { ...DEFAULT_FILTERS }
+      filters: { ...DEFAULT_FILTERS },
+      preRebootResults: [],
+      preRebootTotal: 0,
+      preRebootFilters: { ...DEFAULT_PRE_REBOOT_FILTERS }
     })
   },
 
@@ -98,7 +130,7 @@ export const useStore = create((set, get) => ({
     return res
   },
 
-  // Search & database state
+  // Post-Reboot Search & database state
   filters:    { ...DEFAULT_FILTERS },
   results:    [],
   assayCols:  [],
@@ -151,4 +183,56 @@ export const useStore = create((set, get) => ({
   setLoading: (v) => set({ loading: v }),
   setStats:   (v) => set({ stats: v }),
   setAssayTypes: (v) => set({ assayTypes: v }),
+
+  // ── Pre-Reboot Bio-Repository State (2017–2020 MBT) ─────────────────────────
+  preRebootFilters: { ...DEFAULT_PRE_REBOOT_FILTERS },
+  preRebootStats: null,
+  preRebootResults: [],
+  preRebootTotal: 0,
+  preRebootTotalPages: 0,
+  preRebootPage: 0,
+  preRebootPageSize: 50,
+  preRebootSortCol: 'mbt',
+  preRebootSortAsc: true,
+  preRebootLoading: false,
+
+  setPreRebootFilter: (key, value) =>
+    set(s => ({ preRebootFilters: { ...s.preRebootFilters, [key]: value }, preRebootPage: 0 })),
+
+  setPreRebootSort: (col) => {
+    const { preRebootSortCol, preRebootSortAsc, runPreRebootSearch } = get()
+    if (preRebootSortCol === col) {
+      set({ preRebootSortAsc: !preRebootSortAsc, preRebootPage: 0 })
+    } else {
+      set({ preRebootSortCol: col, preRebootSortAsc: true, preRebootPage: 0 })
+    }
+    setTimeout(() => runPreRebootSearch(), 10)
+  },
+
+  setPreRebootPage: (p) => {
+    set({ preRebootPage: p })
+    setTimeout(() => get().runPreRebootSearch(), 10)
+  },
+
+  setPreRebootStats: (v) => set({ preRebootStats: v }),
+
+  runPreRebootSearch: () => {
+    const { preRebootFilters, preRebootPage, preRebootPageSize, preRebootSortCol, preRebootSortAsc, authFetch } = get()
+    set({ preRebootLoading: true })
+    const qs = buildPreRebootQS(preRebootFilters, preRebootPage, preRebootPageSize, preRebootSortCol, preRebootSortAsc)
+    authFetch(`/api/pre_reboot/search?${qs}`)
+      .then(r => r.json())
+      .then(data => set({
+        preRebootResults:    data.results || [],
+        preRebootTotal:      data.total || 0,
+        preRebootTotalPages: data.total_pages || 0,
+        preRebootLoading:    false,
+      }))
+      .catch(() => set({ preRebootLoading: false }))
+  },
+
+  clearPreRebootFilters: () => {
+    set({ preRebootFilters: { ...DEFAULT_PRE_REBOOT_FILTERS }, preRebootPage: 0 })
+    setTimeout(() => get().runPreRebootSearch(), 10)
+  }
 }))

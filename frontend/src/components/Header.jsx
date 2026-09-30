@@ -104,7 +104,7 @@ function StatPanel({ id, stats, onClose }) {
 }
 
 export default function Header() {
-  const { user, currentView, setCurrentView, logout } = useStore()
+  const { user, currentView, setCurrentView, logout, preRebootStats } = useStore()
   const stats = useStore(s => s.stats)
   const [openPanel, setOpenPanel] = useState(null)
   const [showAssayGuide, setShowAssayGuide] = useState(false)
@@ -122,38 +122,86 @@ export default function Header() {
 
   return (
     <header className="main-header">
-      <div className="logo" onClick={() => setCurrentView('database')} style={{ cursor: 'pointer' }}>
+      <div className="logo" onClick={() => setCurrentView('hub')} style={{ cursor: 'pointer' }} title="Return to Farcast Era Hub">
         <FarcastLogo height={34} showSub={true} />
       </div>
 
-      <div className="hstats" style={{ position: 'relative' }}>
-        {badges.map(({ id, num, label }) => (
-          <button
-            key={id}
-            className={`hstat${openPanel === id ? ' active' : ''}`}
-            onClick={() => toggle(id)}
-          >
-            <b>{num}</b> {label}
-          </button>
-        ))}
-        {openPanel && (
-          <StatPanel
-            id={openPanel}
-            stats={stats}
-            onClose={() => setOpenPanel(null)}
-          />
-        )}
+      {/* Era Navigation Switcher */}
+      <div className="era-nav-tabs">
+        <button
+          className={`era-tab ${currentView === 'hub' ? 'active' : ''}`}
+          onClick={() => setCurrentView('hub')}
+          title="Landing Hub & Era Selection"
+        >
+          <span className="era-tab-icon">🏠</span>
+          <span className="era-tab-title">Portal Hub</span>
+        </button>
+        <button
+          className={`era-tab ${currentView === 'database' ? 'active' : ''}`}
+          onClick={() => setCurrentView('database')}
+          title="Post-Reboot Active Farcast Database (2021-Present)"
+        >
+          <span className="era-tab-icon">🔬</span>
+          <span className="era-tab-title">Post-Reboot DB</span>
+          <span className="era-tab-badge post">Active</span>
+        </button>
+        <button
+          className={`era-tab ${currentView === 'pre_reboot' ? 'active' : ''}`}
+          onClick={() => setCurrentView('pre_reboot')}
+          title="Pre-Reboot Bio-Repository Archive (2017-2020 MBT)"
+        >
+          <span className="era-tab-icon">🏛️</span>
+          <span className="era-tab-title">Bio-Repository (Pre-Reboot)</span>
+          <span className="era-tab-badge pre">{preRebootStats?.total_samples ? `${(preRebootStats.total_samples / 1000).toFixed(1)}k` : '22.1k'}</span>
+        </button>
       </div>
+
+      {currentView === 'database' && (
+        <div className="hstats" style={{ position: 'relative' }}>
+          {badges.map(({ id, num, label }) => (
+            <button
+              key={id}
+              className={`hstat${openPanel === id ? ' active' : ''}`}
+              onClick={() => toggle(id)}
+            >
+              <b>{num}</b> {label}
+            </button>
+          ))}
+          {openPanel && (
+            <StatPanel
+              id={openPanel}
+              stats={stats}
+              onClose={() => setOpenPanel(null)}
+            />
+          )}
+        </div>
+      )}
+
+      {currentView === 'pre_reboot' && preRebootStats && (
+        <div className="hstats pre-reboot-hstats">
+          <div className="hstat static-badge">
+            <b>{preRebootStats.total_samples?.toLocaleString() || '22,094'}</b> MBT Samples
+          </div>
+          <div className="hstat static-badge">
+            <b>{preRebootStats.with_block_count?.toLocaleString() || '2,773'}</b> Blocks
+          </div>
+          <div className="hstat static-badge">
+            <b>{preRebootStats.scored_count?.toLocaleString() || '951'}</b> Scored
+          </div>
+        </div>
+      )}
 
       {user && (
         <div className="header-user-actions">
-          <button 
-            className="header-nav-btn assay-guide-btn" 
-            onClick={() => setShowAssayGuide(true)}
-            title="View Assay Details & Readout Descriptions"
-          >
-            🔬 Assay Details
-          </button>
+          {currentView === 'database' && (
+            <button 
+              className="header-nav-btn assay-guide-btn" 
+              onClick={() => setShowAssayGuide(true)}
+              title="View Assay Details & Readout Descriptions"
+            >
+              🔬 Assay Details
+            </button>
+          )}
 
           {user.role === 'admin' && (
             <button 

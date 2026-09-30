@@ -92,6 +92,97 @@ def load_metadata() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def load_pre_reboot_metadata() -> pd.DataFrame:
+    """Load pre-reboot historical bio-repository metadata table from PostgreSQL database."""
+    try:
+        engine = get_db_engine()
+        df = pd.read_sql_query(text('SELECT * FROM "pre_reboot_metadata" ORDER BY id ASC'), engine)
+        if not df.empty:
+            print(f"  Successfully loaded {len(df)} pre-reboot metadata rows from Database.")
+            return clean_df(df)
+    except Exception as e:
+        print(f"  [Pre-Reboot Loader Error] Failed loading pre_reboot_metadata from Database: {e}")
+    return pd.DataFrame()
+
+
+def compute_pre_reboot_stats(df: pd.DataFrame) -> dict:
+    """Compute summary metrics for pre-reboot bio-repository samples."""
+    if df.empty:
+        return {
+            'total_samples': 0,
+            'years': {},
+            'main_cancer_types': {},
+            'primary_studies': {},
+            'hospitals': {},
+            'ffpe_available_count': 0,
+            'scored_samples_count': 0,
+            'image_samples_count': 0,
+        }
+    
+    years = df['year'].replace('', pd.NA).dropna().value_counts().to_dict() if 'year' in df.columns else {}
+    main_cancers = df['main_cancer_type'].replace('', pd.NA).dropna().value_counts().head(20).to_dict() if 'main_cancer_type' in df.columns else {}
+    studies = df['primary_study'].replace('', pd.NA).dropna().value_counts().head(15).to_dict() if 'primary_study' in df.columns else {}
+    hospitals = df['hospital'].replace('', pd.NA).dropna().value_counts().head(15).to_dict() if 'hospital' in df.columns else {}
+    
+    ffpe_count = int(df['ffpe_block_availability'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).dropna().count()) if 'ffpe_block_availability' in df.columns else 0
+    
+    scored_mask = pd.Series(False, index=df.index)
+    if 't0_score' in df.columns:
+        scored_mask |= df['t0_score'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()
+    if 't72_score' in df.columns:
+        scored_mask |= df['t72_score'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()
+    scored_count = int(scored_mask.sum())
+    
+    image_mask = pd.Series(False, index=df.index)
+    if 't0_images' in df.columns:
+        image_mask |= df['t0_images'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()
+    if 't72_images' in df.columns:
+        image_mask |= df['t72_images'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()
+    image_count = int(image_mask.sum())
+
+    return {
+        'total_samples': len(df),
+        'years': years,
+        'main_cancer_types': main_cancers,
+        'primary_studies': studies,
+        'hospitals': hospitals,
+        'ffpe_available_count': ffpe_count,
+        'scored_samples_count': scored_count,
+        'image_samples_count': image_count,
+    }
+
+
+def build_pre_reboot_indexes(df: pd.DataFrame) -> dict:
+    """Build fast lookup indexes for pre-reboot bio-repository search."""
+    cancer_idx = {}
+    main_cancer_idx = {}
+    study_idx = {}
+    hospital_idx = {}
+    year_idx = {}
+
+    for idx_val, row in df.iterrows():
+        c = str(row.get('cancer_type', '')).strip().lower()
+        mc = str(row.get('main_cancer_type', '')).strip().lower()
+        st = str(row.get('primary_study', '')).strip().lower()
+        h = str(row.get('hospital', '')).strip().lower()
+        y = str(row.get('year', '')).strip().lower()
+        
+        if c: cancer_idx.setdefault(c, set()).add(idx_val)
+        if mc: main_cancer_idx.setdefault(mc, set()).add(idx_val)
+        if st: study_idx.setdefault(st, set()).add(idx_val)
+        if h: hospital_idx.setdefault(h, set()).add(idx_val)
+        if y: year_idx.setdefault(y, set()).add(idx_val)
+
+    return {
+        'cancer': cancer_idx,
+        'main_cancer': main_cancer_idx,
+        'study': study_idx,
+        'hospital': hospital_idx,
+        'year': year_idx,
+        'all_indices': set(df.index),
+    }
+
+
 def build_overlay() -> pd.DataFrame:
     """Load overlay table strictly from PostgreSQL database."""
     try:

@@ -5,16 +5,18 @@ import Sidebar from './components/Sidebar'
 import ResultsTable from './components/ResultsTable'
 import SignPage from './components/SignPage'
 import AdminPage from './components/AdminPage'
+import LandingHub from './components/LandingHub'
+import PreRebootExplorer from './components/PreRebootExplorer'
 
 export default function App() {
   const { 
     token, user, currentView, filters, runSearch, 
-    setStats, setAssayTypes, authFetch 
+    setStats, setAssayTypes, loadPreRebootStats, authFetch 
   } = useStore()
 
   const total = useStore(s => s.total)
 
-  // Load stats + assay types whenever authenticated & whitelisted
+  // Load stats + assay types + pre-reboot stats whenever authenticated & whitelisted
   useEffect(() => {
     if (token && user?.is_whitelisted) {
       authFetch('/api/stats')
@@ -26,6 +28,9 @@ export default function App() {
         .then(r => r.json())
         .then(setAssayTypes)
         .catch(() => {})
+
+      // Pre-reboot stats
+      loadPreRebootStats()
     }
   }, [token, user])
 
@@ -34,7 +39,7 @@ export default function App() {
     return <SignPage />
   }
 
-  // Active filter tag pills for context bar
+  // Active filter tag pills for context bar (Post-reboot)
   const activeTags = []
   const add = (label, vals) => vals?.forEach(v => activeTags.push({ label, val: v }))
   add('Drug',       filters.drug)
@@ -43,7 +48,6 @@ export default function App() {
   add('Site',       filters.tumor_site)
   add('Study Type', filters.study)
   add('Study Code', filters.project)
-
 
   add('Assay',      filters.assay)
   if (filters.sample) activeTags.push({ label: 'Sample', val: filters.sample })
@@ -55,7 +59,11 @@ export default function App() {
     <div className="app-layout">
       <Header />
       
-      {currentView === 'admin' ? (
+      {currentView === 'hub' ? (
+        <LandingHub />
+      ) : currentView === 'pre_reboot' ? (
+        <PreRebootExplorer />
+      ) : currentView === 'admin' ? (
         <AdminPage />
       ) : (
         <div className="body-layout">
