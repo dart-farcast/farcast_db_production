@@ -216,6 +216,14 @@ export const useStore = create((set, get) => ({
 
   setPreRebootStats: (v) => set({ preRebootStats: v }),
 
+  loadPreRebootStats: () => {
+    const { authFetch } = get()
+    authFetch('/api/pre_reboot/stats')
+      .then(r => r.json())
+      .then(data => set({ preRebootStats: data }))
+      .catch(() => {})
+  },
+
   runPreRebootSearch: () => {
     const { preRebootFilters, preRebootPage, preRebootPageSize, preRebootSortCol, preRebootSortAsc, authFetch } = get()
     set({ preRebootLoading: true })
