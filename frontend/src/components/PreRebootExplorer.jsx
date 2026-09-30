@@ -140,6 +140,7 @@ export default function PreRebootExplorer() {
               placeholder="e.g. HNSCC, Ca CaBr, CRC..."
               selected={preRebootFilters.main_cancer_type}
               onChange={v => setPreRebootFilter('main_cancer_type', v)}
+              apiEndpoint="/api/pre_reboot/autocomplete"
             />
 
             {/* Primary Study */}
@@ -149,6 +150,7 @@ export default function PreRebootExplorer() {
               placeholder="e.g. 1st level attrition, Biopharma..."
               selected={preRebootFilters.primary_study}
               onChange={v => setPreRebootFilter('primary_study', v)}
+              apiEndpoint="/api/pre_reboot/autocomplete"
             />
 
             {/* Hospital */}
@@ -158,6 +160,7 @@ export default function PreRebootExplorer() {
               placeholder="e.g. KIDWAI, Manipal..."
               selected={preRebootFilters.hospital}
               onChange={v => setPreRebootFilter('hospital', v)}
+              apiEndpoint="/api/pre_reboot/autocomplete"
             />
 
             {/* Collection Year */}
@@ -167,6 +170,7 @@ export default function PreRebootExplorer() {
               placeholder="e.g. 2017, 2018, 2019, 2020"
               selected={preRebootFilters.year}
               onChange={v => setPreRebootFilter('year', v)}
+              apiEndpoint="/api/pre_reboot/autocomplete"
             />
 
             {/* Quick Toggles */}

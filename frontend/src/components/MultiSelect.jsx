@@ -10,7 +10,10 @@ import { useStore } from '../store'
  *   selected     — string[] of selected values
  *   onChange     — (newArray) => void
  */
-export default function MultiSelect({ field, label, placeholder, selected = [], onChange }) {
+export default function MultiSelect({ 
+  field, label, placeholder, selected = [], onChange, 
+  apiEndpoint = '/api/autocomplete' 
+}) {
   const { authFetch, filters } = useStore()
   const [query, setQuery]       = useState('')
   const [opts, setOpts]         = useState([])
@@ -22,8 +25,9 @@ export default function MultiSelect({ field, label, placeholder, selected = [], 
   const isQual = Boolean(filters?.qualified_only)
 
   const fetchOpts = useCallback((q) => {
-    const qualParam = isQual ? '&qualified_only=true' : ''
-    authFetch(`/api/autocomplete?field=${field}&q=${encodeURIComponent(q || '')}${qualParam}`)
+    const qualParam = (isQual && !apiEndpoint.includes('pre_reboot')) ? '&qualified_only=true' : ''
+    const sep = apiEndpoint.includes('?') ? '&' : '?'
+    authFetch(`${apiEndpoint}${sep}field=${field}&q=${encodeURIComponent(q || '')}${qualParam}`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -34,7 +38,7 @@ export default function MultiSelect({ field, label, placeholder, selected = [], 
         setHiIdx(-1)
       })
       .catch(() => setOpts([]))
-  }, [field, selected, authFetch, isQual])
+  }, [field, selected, authFetch, isQual, apiEndpoint])
 
   const handleInput = (e) => {
     const q = e.target.value
