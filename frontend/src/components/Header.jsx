@@ -124,23 +124,13 @@ export default function Header() {
     <header className="main-header">
       {/* Left Branding & Mode Indicator */}
       <div className="header-left-group">
-        <div className="logo" onClick={() => setCurrentView('hub')} style={{ cursor: 'pointer' }} title="Return to Portal Hub">
-          <FarcastLogo height={32} showSub={true} />
+        <div className="logo logo-clickable" onClick={() => setCurrentView('hub')} title="Return to Portal Hub">
+          <FarcastLogo height={36} showSub={true} />
         </div>
-
-        {currentView !== 'hub' && (
-          <button 
-            className="header-hub-back-btn" 
-            onClick={() => setCurrentView('hub')}
-            title="Return to Main Portal Hub"
-          >
-            ← Portal Hub
-          </button>
-        )}
 
         {currentView === 'database' && (
           <span className="era-badge-indicator post">
-            Post-Reboot DB
+            Perturbation Samples
           </span>
         )}
 

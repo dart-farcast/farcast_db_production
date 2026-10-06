@@ -57,18 +57,18 @@ export default function LandingHub() {
             <span className="combined-kpi-num">{combinedTotalNum.toLocaleString()}</span>
             <div className="combined-label-group">
               <span className="combined-title">Total Farcast Repository Samples</span>
-              <span className="combined-sub">Combining both Active Post-Reboot and Historical Pre-Reboot eras</span>
+              <span className="combined-sub">Combining both Perturbation Studies and Archival Bio-Repository collections</span>
             </div>
           </div>
           <div className="combined-right-pills">
             <div className="combined-pill post">
               <span className="pill-dot post">●</span>
-              <b>{postSamples}</b> Post-Reboot
+              <b>{postSamples}</b> Perturbation Samples
             </div>
             <div className="combined-pill plus">+</div>
             <div className="combined-pill pre">
               <span className="pill-dot pre">●</span>
-              <b>{preSamples}</b> Pre-Reboot (MBT)
+              <b>{preSamples}</b> Bio-Repository
             </div>
           </div>
         </div>
@@ -76,16 +76,16 @@ export default function LandingHub() {
 
       {/* ── Two Era Cards Grid ── */}
       <div className="hub-cards-grid">
-        {/* Card 1: Post-Reboot Multimodal Database */}
+        {/* Card 1: Perturbation Samples */}
         <div className="hub-card post-reboot-card" onClick={handleSelectPostReboot}>
           <div className="hub-card-header">
-            <div className="hub-card-tag active-tag">Active Production DB</div>
-            <div className="hub-era-badge">Post-Reboot (2021–Present)</div>
+            <div className="hub-card-tag active-tag">Active Production Platform</div>
+            <div className="hub-era-badge">Multimodal Database</div>
           </div>
           
           <div className="hub-card-body">
             <div className="hub-card-icon post-icon">🔬</div>
-            <h2 className="hub-card-title">Post-Reboot Multimodal Portal</h2>
+            <h2 className="hub-card-title">Perturbation Samples</h2>
             <p className="hub-card-desc">
               Standardized clinical oncology database integrating multidimensional assay readouts, 
               drug combinations, treatment arm controls, and directional platform response categorization.
@@ -128,27 +128,27 @@ export default function LandingHub() {
 
           <div className="hub-card-footer">
             <button className="hub-launch-btn post-reboot-btn">
-              Launch Post-Reboot Portal →
+              Launch Perturbation Samples →
             </button>
           </div>
         </div>
 
-        {/* Card 2: Pre-Reboot Historical Bio-Repository */}
+        {/* Card 2: Bio-Repository */}
         <div className="hub-card pre-reboot-card" onClick={handleSelectPreReboot}>
           <div className="hub-card-header">
-            <div className="hub-card-tag legacy-tag">Historical Bio-Repository</div>
-            <div className="hub-era-badge">Pre-Reboot (2017–2020 MBT)</div>
+            <div className="hub-card-tag legacy-tag">Archival Bio-Repository</div>
+            <div className="hub-era-badge">2017–2020 MBT Registry</div>
           </div>
 
           <div className="hub-card-body">
             <div className="hub-card-icon pre-icon">🏛️</div>
-            <h2 className="hub-card-title">Pre-Reboot Bio-Repository</h2>
+            <h2 className="hub-card-title">Bio-Repository</h2>
             <p className="hub-card-desc">
               Extensive longitudinal cancer bio-repository capturing historical clinical cases, 
-              legacy MBT sample codes, tissue metrics, FFPE block inventory, and pathology scoring.
+              legacy MBT sample codes, tissue metrics, and digital pathology scoring.
             </p>
 
-            <div className="hub-kpi-row">
+            <div className="hub-kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               <div className="hub-kpi-item">
                 <span className="hub-kpi-num">{preSamples}</span>
                 <span className="hub-kpi-label">Historical MBTs</span>
@@ -158,12 +158,8 @@ export default function LandingHub() {
                 <span className="hub-kpi-label">Years (2017–20)</span>
               </div>
               <div className="hub-kpi-item">
-                <span className="hub-kpi-num">{preFFPE}</span>
-                <span className="hub-kpi-label">FFPE Blocks</span>
-              </div>
-              <div className="hub-kpi-item">
                 <span className="hub-kpi-num">{preScored}</span>
-                <span className="hub-kpi-label">Scored</span>
+                <span className="hub-kpi-label">Pathology Scored</span>
               </div>
             </div>
 
@@ -185,7 +181,7 @@ export default function LandingHub() {
 
           <div className="hub-card-footer">
             <button className="hub-launch-btn pre-reboot-btn">
-              Explore Pre-Reboot Bio-Repository →
+              Explore Bio-Repository →
             </button>
           </div>
         </div>
@@ -199,8 +195,8 @@ export default function LandingHub() {
             <thead>
               <tr>
                 <th>Feature / Characteristic</th>
-                <th>Post-Reboot Database (Active)</th>
-                <th>Pre-Reboot Bio-Repository (Historical)</th>
+                <th>Perturbation Samples (Active)</th>
+                <th>Bio-Repository (Historical)</th>
               </tr>
             </thead>
             <tbody>
@@ -222,7 +218,7 @@ export default function LandingHub() {
               <tr>
                 <td><b>Integrated Assays</b></td>
                 <td>Histopathology, Cytokine Release, mIHC, NanoString</td>
-                <td>Pathology Scores (T0/T72), Images & Block Inventory</td>
+                <td>Pathology Scores (T0/T72) & Specimen Metrics</td>
               </tr>
               <tr>
                 <td><b>Treatment & Drug Arms</b></td>

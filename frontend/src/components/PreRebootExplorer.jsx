@@ -62,11 +62,11 @@ export default function PreRebootExplorer() {
 
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.json_to_sheet(rows)
-      XLSX.utils.book_append_sheet(wb, ws, "Pre_Reboot_Biorepository")
-      XLSX.writeFile(wb, `Pre_Reboot_Biorepository_${rows.length}_samples.xlsx`)
+      XLSX.utils.book_append_sheet(wb, ws, "Bio_Repository")
+      XLSX.writeFile(wb, `Bio_Repository_${rows.length}_samples.xlsx`)
     } catch (err) {
       console.error("Export error:", err)
-      alert("Failed to export Pre-Reboot data.")
+      alert("Failed to export Bio-Repository data.")
     } finally {
       setDownloadingExcel(false)
     }
@@ -83,7 +83,7 @@ export default function PreRebootExplorer() {
       {/* ── Left Sidebar Filters ── */}
       <aside>
         <div className="sb-section">
-          <div className="sb-head">Pre-Reboot Filters</div>
+          <div className="sb-head">Bio-Repository Filters</div>
 
           {/* MBT ID Search */}
           <div className="ff">
