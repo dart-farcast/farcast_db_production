@@ -122,40 +122,36 @@ export default function Header() {
 
   return (
     <header className="main-header">
-      <div className="logo" onClick={() => setCurrentView('hub')} style={{ cursor: 'pointer' }} title="Return to Farcast Era Hub">
-        <FarcastLogo height={34} showSub={true} />
+      {/* Left Branding & Mode Indicator */}
+      <div className="header-left-group">
+        <div className="logo" onClick={() => setCurrentView('hub')} style={{ cursor: 'pointer' }} title="Return to Portal Hub">
+          <FarcastLogo height={32} showSub={true} />
+        </div>
+
+        {currentView !== 'hub' && (
+          <button 
+            className="header-hub-back-btn" 
+            onClick={() => setCurrentView('hub')}
+            title="Return to Main Portal Hub"
+          >
+            ← Portal Hub
+          </button>
+        )}
+
+        {currentView === 'database' && (
+          <span className="era-badge-indicator post">
+            Post-Reboot DB
+          </span>
+        )}
+
+        {currentView === 'pre_reboot' && (
+          <span className="era-badge-indicator pre">
+            Bio-Repository (2017–2020)
+          </span>
+        )}
       </div>
 
-      {/* Era Navigation Switcher */}
-      <div className="era-nav-tabs">
-        <button
-          className={`era-tab ${currentView === 'hub' ? 'active' : ''}`}
-          onClick={() => setCurrentView('hub')}
-          title="Landing Hub & Era Selection"
-        >
-          <span className="era-tab-icon">🏠</span>
-          <span className="era-tab-title">Portal Hub</span>
-        </button>
-        <button
-          className={`era-tab ${currentView === 'database' ? 'active' : ''}`}
-          onClick={() => setCurrentView('database')}
-          title="Post-Reboot Active Farcast Database (2021-Present)"
-        >
-          <span className="era-tab-icon">🔬</span>
-          <span className="era-tab-title">Post-Reboot DB</span>
-          <span className="era-tab-badge post">Active</span>
-        </button>
-        <button
-          className={`era-tab ${currentView === 'pre_reboot' ? 'active' : ''}`}
-          onClick={() => setCurrentView('pre_reboot')}
-          title="Pre-Reboot Bio-Repository Archive (2017-2020 MBT)"
-        >
-          <span className="era-tab-icon">🏛️</span>
-          <span className="era-tab-title">Bio-Repository (Pre-Reboot)</span>
-          <span className="era-tab-badge pre">{preRebootStats?.total_samples ? `${(preRebootStats.total_samples / 1000).toFixed(1)}k` : '22.1k'}</span>
-        </button>
-      </div>
-
+      {/* Center Stats */}
       {currentView === 'database' && (
         <div className="hstats" style={{ position: 'relative' }}>
           {badges.map(({ id, num, label }) => (
@@ -180,7 +176,7 @@ export default function Header() {
       {currentView === 'pre_reboot' && preRebootStats && (
         <div className="hstats pre-reboot-hstats">
           <div className="hstat static-badge">
-            <b>{preRebootStats.total_samples?.toLocaleString() || '22,094'}</b> MBT Samples
+            <b>{preRebootStats.total_samples?.toLocaleString() || '22,094'}</b> MBTs
           </div>
           <div className="hstat static-badge">
             <b>{preRebootStats.with_block_count?.toLocaleString() || '2,773'}</b> Blocks
@@ -191,6 +187,7 @@ export default function Header() {
         </div>
       )}
 
+      {/* Right User Actions */}
       {user && (
         <div className="header-user-actions">
           {currentView === 'database' && (
@@ -205,10 +202,10 @@ export default function Header() {
 
           {user.role === 'admin' && (
             <button 
-              className={`header-nav-btn ${currentView === 'admin' ? 'active' : ''}`}
+              className={`header-nav-btn admin-nav-btn ${currentView === 'admin' ? 'active' : ''}`}
               onClick={() => setCurrentView(currentView === 'admin' ? 'database' : 'admin')}
             >
-              {currentView === 'admin' ? '📊 Database Search' : '🛡️ Admin Console'}
+              {currentView === 'admin' ? '📊 Database' : '🛡️ Admin'}
             </button>
           )}
 
@@ -216,7 +213,7 @@ export default function Header() {
             <span className="user-avatar">{user.full_name ? user.full_name[0].toUpperCase() : user.email[0].toUpperCase()}</span>
             <div className="user-info">
               <span className="user-name">{user.full_name || user.email.split('@')[0]}</span>
-              <span className="user-role">{user.role === 'admin' ? 'Admin' : 'Whitelisted User'}</span>
+              <span className="user-role">{user.role === 'admin' ? 'Admin' : 'User'}</span>
             </div>
           </div>
 

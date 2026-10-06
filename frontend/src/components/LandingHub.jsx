@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react'
 import { useStore } from '../store'
-import FarcastLogo from './FarcastLogo'
 
 export default function LandingHub() {
   const { 
@@ -24,38 +23,68 @@ export default function LandingHub() {
     runPreRebootSearch()
   }
 
-  const postSamples = stats?.samples?.toLocaleString() ?? '2,148'
-  const postDrugs = stats?.drugs?.toLocaleString() ?? '83'
+  // Calculate live and combined statistics
+  const postSamplesNum = stats?.samples || 2148
+  const preSamplesNum = preRebootStats?.total_samples || 22094
+  const combinedTotalNum = postSamplesNum + preSamplesNum
+
+  const postSamples = postSamplesNum.toLocaleString()
+  const postQualified = stats?.qualified_samples?.toLocaleString() || '1,592'
+  const postDrugs = stats?.drugs?.toLocaleString() || '83'
   const postAssays = Object.keys(stats?.assay_samples || {}).length || 4
 
-  const preSamples = preRebootStats?.total_samples?.toLocaleString() ?? '22,094'
+  const preSamples = preSamplesNum.toLocaleString()
   const preYears = Object.keys(preRebootStats?.years || {}).length || 4
-  const preFFPE = preRebootStats?.ffpe_available_count?.toLocaleString() ?? '11,540'
-  const preScored = preRebootStats?.scored_samples_count?.toLocaleString() ?? '17,210'
+  const preFFPE = (preRebootStats?.with_block_count ?? preRebootStats?.ffpe_available_count ?? 2773).toLocaleString()
+  const preScored = (preRebootStats?.scored_count ?? preRebootStats?.scored_samples_count ?? 951).toLocaleString()
 
   return (
     <div className="hub-container">
-      {/* Hero Welcome Header */}
+      {/* ── Top Hero & Combined Repository KPI Banner ── */}
       <div className="hub-hero">
-        <div className="hub-badge-pill">FARCAST DATA EXPLORER &bull; MULTI-ERA REPOSITORY</div>
-        <h1 className="hub-title">Unified Clinical & Bio-Repository Portal</h1>
+        <div className="hub-badge-pill">
+          FARCAST DATA EXPLORER &bull; MULTI-ERA REPOSITORY
+        </div>
+        <h1 className="hub-title">Farcast Unified Data Portal</h1>
         <p className="hub-subtitle">
-          Seamlessly access, search, and analyze Farcast's multi-omics clinical study database 
-          alongside the comprehensive 2017–2020 Historical Bio-Repository.
+          Access Farcast's active multimodal clinical oncology database alongside 
+          the comprehensive 2017–2020 Historical Bio-Repository.
         </p>
+
+        {/* Prominent Combined Total Counter */}
+        <div className="hub-combined-banner">
+          <div className="combined-left">
+            <span className="combined-kpi-num">{combinedTotalNum.toLocaleString()}</span>
+            <div className="combined-label-group">
+              <span className="combined-title">Total Farcast Repository Samples</span>
+              <span className="combined-sub">Combining both Active Post-Reboot and Historical Pre-Reboot eras</span>
+            </div>
+          </div>
+          <div className="combined-right-pills">
+            <div className="combined-pill post">
+              <span className="pill-dot post">●</span>
+              <b>{postSamples}</b> Post-Reboot
+            </div>
+            <div className="combined-pill plus">+</div>
+            <div className="combined-pill pre">
+              <span className="pill-dot pre">●</span>
+              <b>{preSamples}</b> Pre-Reboot (MBT)
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Two Main Era Cards */}
+      {/* ── Two Era Cards Grid ── */}
       <div className="hub-cards-grid">
         {/* Card 1: Post-Reboot Multimodal Database */}
         <div className="hub-card post-reboot-card" onClick={handleSelectPostReboot}>
           <div className="hub-card-header">
-            <div className="hub-card-tag active-tag">Active Study Platform</div>
-            <div className="hub-era-badge">Post-Reboot (FarCast DB v2)</div>
+            <div className="hub-card-tag active-tag">Active Production DB</div>
+            <div className="hub-era-badge">Post-Reboot (2021–Present)</div>
           </div>
           
           <div className="hub-card-body">
-            <div className="hub-card-icon">🔬</div>
+            <div className="hub-card-icon post-icon">🔬</div>
             <h2 className="hub-card-title">Post-Reboot Multimodal Portal</h2>
             <p className="hub-card-desc">
               Standardized clinical oncology database integrating multidimensional assay readouts, 
@@ -68,19 +97,32 @@ export default function LandingHub() {
                 <span className="hub-kpi-label">Active Samples</span>
               </div>
               <div className="hub-kpi-item">
-                <span className="hub-kpi-num">{postAssays}</span>
-                <span className="hub-kpi-label">Omics Assays</span>
+                <span className="hub-kpi-num">{postQualified}</span>
+                <span className="hub-kpi-label">Qualified</span>
               </div>
               <div className="hub-kpi-item">
                 <span className="hub-kpi-num">{postDrugs}</span>
                 <span className="hub-kpi-label">Tested Drugs</span>
               </div>
+              <div className="hub-kpi-item">
+                <span className="hub-kpi-num">{postAssays}</span>
+                <span className="hub-kpi-label">Assay Types</span>
+              </div>
             </div>
 
             <div className="hub-feature-list">
-              <div className="hub-feature-item">✓ Histopathology, Cytokines, mIHC & NanoString readouts</div>
-              <div className="hub-feature-item">✓ Arm-level matched drug highlights & Strict RXA control filter</div>
-              <div className="hub-feature-item">✓ Platform Response classification (Responder / Non-responder)</div>
+              <div className="hub-feature-item">
+                <span className="feat-check">✓</span>
+                <span>Histopathology, Cytokines, mIHC & NanoString assays</span>
+              </div>
+              <div className="hub-feature-item">
+                <span className="feat-check">✓</span>
+                <span>Arm-level matched drug highlights & Strict RXA control filter</span>
+              </div>
+              <div className="hub-feature-item">
+                <span className="feat-check">✓</span>
+                <span>Platform Response classification (Responder / Non-responder)</span>
+              </div>
             </div>
           </div>
 
@@ -94,16 +136,16 @@ export default function LandingHub() {
         {/* Card 2: Pre-Reboot Historical Bio-Repository */}
         <div className="hub-card pre-reboot-card" onClick={handleSelectPreReboot}>
           <div className="hub-card-header">
-            <div className="hub-card-tag legacy-tag">Historical Archive (2017–2020)</div>
-            <div className="hub-era-badge">Pre-Reboot (MBT Registry)</div>
+            <div className="hub-card-tag legacy-tag">Historical Bio-Repository</div>
+            <div className="hub-era-badge">Pre-Reboot (2017–2020 MBT)</div>
           </div>
 
           <div className="hub-card-body">
-            <div className="hub-card-icon">🏛️</div>
+            <div className="hub-card-icon pre-icon">🏛️</div>
             <h2 className="hub-card-title">Pre-Reboot Bio-Repository</h2>
             <p className="hub-card-desc">
               Extensive longitudinal cancer bio-repository capturing historical clinical cases, 
-              legacy MBT sample codes, tissue metrics, FFPE block availability, and T0/T72 pathology scoring.
+              legacy MBT sample codes, tissue metrics, FFPE block inventory, and pathology scoring.
             </p>
 
             <div className="hub-kpi-row">
@@ -113,18 +155,31 @@ export default function LandingHub() {
               </div>
               <div className="hub-kpi-item">
                 <span className="hub-kpi-num">{preYears}</span>
-                <span className="hub-kpi-label">Years (2017–2020)</span>
+                <span className="hub-kpi-label">Years (2017–20)</span>
               </div>
               <div className="hub-kpi-item">
                 <span className="hub-kpi-num">{preFFPE}</span>
                 <span className="hub-kpi-label">FFPE Blocks</span>
               </div>
+              <div className="hub-kpi-item">
+                <span className="hub-kpi-num">{preScored}</span>
+                <span className="hub-kpi-label">Scored</span>
+              </div>
             </div>
 
             <div className="hub-feature-list">
-              <div className="hub-feature-item">✓ 22,094 legacy MBT samples across 4 longitudinal years</div>
-              <div className="hub-feature-item">✓ T0 & T72 digital pathology score availability & metrics</div>
-              <div className="hub-feature-item">✓ Hospital relationships, physicians, and procedure types</div>
+              <div className="hub-feature-item">
+                <span className="feat-check pre">✓</span>
+                <span>22,094 legacy MBT samples across 4 longitudinal years</span>
+              </div>
+              <div className="hub-feature-item">
+                <span className="feat-check pre">✓</span>
+                <span>T0 & T72 digital pathology score availability & tissue metrics</span>
+              </div>
+              <div className="hub-feature-item">
+                <span className="feat-check pre">✓</span>
+                <span>Hospital relationships, physicians, and procedure types</span>
+              </div>
             </div>
           </div>
 
@@ -136,9 +191,9 @@ export default function LandingHub() {
         </div>
       </div>
 
-      {/* Comparison Overview Bar */}
+      {/* ── Comparison Overview Matrix ── */}
       <div className="hub-overview-section">
-        <h3 className="hub-overview-title">Repository Comparison Overview</h3>
+        <h3 className="hub-overview-title">Repository Comparison Matrix</h3>
         <div className="hub-table-wrapper">
           <table className="hub-compare-table">
             <thead>
@@ -151,23 +206,23 @@ export default function LandingHub() {
             <tbody>
               <tr>
                 <td><b>Sample ID Format</b></td>
-                <td><span className="mono-badge">FBR1K... / FBR1Q... / FBR2...</span></td>
-                <td><span className="mono-badge">MBT3107 / MBRD6 / MBBP33...</span></td>
+                <td><span className="table-mono-pill post">FBR1K... / FBR1Q... / FBR2...</span></td>
+                <td><span className="table-mono-pill pre">MBT3107 / MBRD6 / MBBP33...</span></td>
               </tr>
               <tr>
                 <td><b>Total Cohort Size</b></td>
-                <td>2,148 Samples (1,592 Qualified)</td>
-                <td>22,094 Historical Bio-Repository Samples</td>
+                <td><b>2,148</b> Samples (1,592 Qualified)</td>
+                <td><b>22,094</b> Historical MBT Samples</td>
               </tr>
               <tr>
                 <td><b>Collection Timeline</b></td>
-                <td>Post-Reboot Production Era</td>
+                <td>2021 &bull; 2022 &bull; 2023 &bull; 2024 &bull; 2025 &bull; 2026</td>
                 <td>2017 &bull; 2018 &bull; 2019 &bull; 2020</td>
               </tr>
               <tr>
                 <td><b>Integrated Assays</b></td>
                 <td>Histopathology, Cytokine Release, mIHC, NanoString</td>
-                <td>Pathology T0/T72 Scores, Images & Block Inventory</td>
+                <td>Pathology Scores (T0/T72), Images & Block Inventory</td>
               </tr>
               <tr>
                 <td><b>Treatment & Drug Arms</b></td>
