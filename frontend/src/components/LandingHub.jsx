@@ -23,20 +23,20 @@ export default function LandingHub() {
     runPreRebootSearch()
   }
 
-  // Calculate live and combined statistics
-  const postSamplesNum = stats?.samples || 2148
-  const preSamplesNum = preRebootStats?.total_samples || 22094
+  // Calculate live and dynamic combined statistics directly from database state
+  const postSamplesNum = Number(stats?.samples || 0)
+  const preSamplesNum = Number(preRebootStats?.total_samples || 0)
   const combinedTotalNum = postSamplesNum + preSamplesNum
 
-  const postSamples = postSamplesNum.toLocaleString()
-  const postQualified = stats?.qualified_samples?.toLocaleString() || '1,592'
-  const postDrugs = stats?.drugs?.toLocaleString() || '83'
-  const postAssays = Object.keys(stats?.assay_samples || {}).length || 4
+  const postSamples = stats?.samples != null ? Number(stats.samples).toLocaleString() : '...'
+  const postQualified = stats?.qualified_samples != null ? Number(stats.qualified_samples).toLocaleString() : '...'
+  const postDrugs = stats?.drugs != null ? Number(stats.drugs).toLocaleString() : '...'
+  const postAssays = stats?.assay_samples ? Object.keys(stats.assay_samples).length : '...'
 
-  const preSamples = preSamplesNum.toLocaleString()
-  const preYears = Object.keys(preRebootStats?.years || {}).length || 4
-  const preFFPE = (preRebootStats?.with_block_count ?? preRebootStats?.ffpe_available_count ?? 2773).toLocaleString()
-  const preScored = (preRebootStats?.scored_count ?? preRebootStats?.scored_samples_count ?? 951).toLocaleString()
+  const preSamples = preRebootStats?.total_samples != null ? Number(preRebootStats.total_samples).toLocaleString() : '...'
+  const preYears = preRebootStats?.years ? Object.keys(preRebootStats.years).length : '...'
+  const preFFPE = preRebootStats?.ffpe_available_count != null ? Number(preRebootStats.ffpe_available_count).toLocaleString() : (preRebootStats?.with_block_count != null ? Number(preRebootStats.with_block_count).toLocaleString() : '...')
+  const preScored = preRebootStats?.scored_samples_count != null ? Number(preRebootStats.scored_samples_count).toLocaleString() : (preRebootStats?.scored_count != null ? Number(preRebootStats.scored_count).toLocaleString() : '...')
 
   return (
     <div className="hub-container">
@@ -211,8 +211,8 @@ export default function LandingHub() {
               </tr>
               <tr>
                 <td><b>Total Cohort Size</b></td>
-                <td><b>2,148</b> Samples (1,592 Qualified)</td>
-                <td><b>22,094</b> Historical MBT Samples</td>
+                <td><b>{postSamples}</b> Samples ({postQualified} Qualified)</td>
+                <td><b>{preSamples}</b> Historical MBT Samples</td>
               </tr>
               <tr>
                 <td><b>Collection Timeline</b></td>
@@ -226,7 +226,7 @@ export default function LandingHub() {
               </tr>
               <tr>
                 <td><b>Treatment & Drug Arms</b></td>
-                <td>83 Drugs, Arm Codes (RXA, RXB, RXC, etc.)</td>
+                <td>{postDrugs} Drugs, Arm Codes (RXA, RXB, RXC, etc.)</td>
                 <td>Primary Study Classification</td>
               </tr>
             </tbody>
