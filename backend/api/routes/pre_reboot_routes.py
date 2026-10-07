@@ -52,6 +52,8 @@ def search_pre_reboot(
     primary_study: str = Query('', description="Comma-separated primary studies"),
     hospital: str = Query('', description="Comma-separated hospital names"),
     year: str = Query('', description="Comma-separated years e.g. 2017,2018,2019,2020"),
+    qualification_status: str = Query('', description="Comma-separated qualification statuses"),
+    final_qualification: str = Query('', description="Comma-separated final qualifications"),
     ffpe_block: str = Query('', description="true/yes to filter samples with FFPE blocks available"),
     scored_only: str = Query('', description="true/yes to filter samples with T0 or T72 scores"),
     page: int = Query(0, ge=0),
@@ -102,11 +104,24 @@ def search_pre_reboot(
         y_set = {y.lower() for y in years}
         mask &= df['year'].astype(str).str.strip().str.lower().isin(y_set)
 
-    # 7. FFPE Block Availability
+    # 7. Qualification Status
+    quals = _parse_multi(qualification_status)
+    if quals:
+        q_set = {q.lower() for q in quals}
+        mask &= df['qualification_status'].astype(str).str.strip().str.lower().isin(q_set)
+
+    # 8. Final Qualification
+    final_quals = _parse_multi(final_qualification)
+    if final_quals:
+        fq_set = {fq.lower() for fq in final_quals}
+        if 'final_qualification' in df.columns:
+            mask &= df['final_qualification'].astype(str).str.strip().str.lower().isin(fq_set)
+
+    # 9. FFPE Block Availability
     if ffpe_block.strip().lower() in ('true', '1', 'yes'):
         mask &= df['ffpe_block_availability'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()
 
-    # 8. Scored Samples Only
+    # 10. Scored Samples Only
     if scored_only.strip().lower() in ('true', '1', 'yes'):
         t0_s = df['t0_score'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()
         t72_s = df['t72_score'].astype(str).str.strip().replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA}).notna()

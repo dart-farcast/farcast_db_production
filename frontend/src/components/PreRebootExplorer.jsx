@@ -46,6 +46,8 @@ export default function PreRebootExplorer() {
       arr('primary_study', preRebootFilters.primary_study)
       arr('hospital', preRebootFilters.hospital)
       arr('year', preRebootFilters.year)
+      arr('qualification_status', preRebootFilters.qualification_status)
+      arr('final_qualification', preRebootFilters.final_qualification)
       if (preRebootFilters.ffpe_block) qs.set('ffpe_block', 'true')
       if (preRebootFilters.scored_only) qs.set('scored_only', 'true')
       qs.set('page', 0)
@@ -111,9 +113,29 @@ export default function PreRebootExplorer() {
           <MultiSelect
             field="primary_study"
             label="Primary Study"
-            placeholder="e.g. 1st level attrition, Biopharma..."
+            placeholder="e.g. NA, Biopharma..."
             selected={preRebootFilters.primary_study}
             onChange={v => setPreRebootFilter('primary_study', v)}
+            apiEndpoint="/api/pre_reboot/autocomplete"
+          />
+
+          {/* Qualification Status */}
+          <MultiSelect
+            field="qualification_status"
+            label="Qualification"
+            placeholder="e.g. 1st level attrition, Q, NQ..."
+            selected={preRebootFilters.qualification_status}
+            onChange={v => setPreRebootFilter('qualification_status', v)}
+            apiEndpoint="/api/pre_reboot/autocomplete"
+          />
+
+          {/* Final Qualification */}
+          <MultiSelect
+            field="final_qualification"
+            label="Final Qualification"
+            placeholder="Filter final qualification..."
+            selected={preRebootFilters.final_qualification}
+            onChange={v => setPreRebootFilter('final_qualification', v)}
             apiEndpoint="/api/pre_reboot/autocomplete"
           />
 
@@ -193,6 +215,12 @@ export default function PreRebootExplorer() {
           {preRebootFilters.primary_study?.map((v, i) => (
             <span className="ctx-tag" key={`ps-${i}`}><span className="label">Study</span><span className="val">{v}</span></span>
           ))}
+          {preRebootFilters.qualification_status?.map((v, i) => (
+            <span className="ctx-tag" key={`qs-${i}`}><span className="label">Qualification</span><span className="val">{v}</span></span>
+          ))}
+          {preRebootFilters.final_qualification?.map((v, i) => (
+            <span className="ctx-tag" key={`fq-${i}`}><span className="label">Final Qual</span><span className="val">{v}</span></span>
+          ))}
           {preRebootFilters.hospital?.map((v, i) => (
             <span className="ctx-tag" key={`h-${i}`}><span className="label">Hospital</span><span className="val">{v}</span></span>
           ))}
@@ -248,13 +276,18 @@ export default function PreRebootExplorer() {
                       Main Cancer {preRebootSortCol === 'main_cancer_type' ? (preRebootSortAsc ? '▲' : '▼') : '⇅'}
                     </th>
                     <th style={{ width: 140 }}>Specific Diagnosis</th>
-                    <th style={{ width: 140 }}>Primary Study</th>
-                    <th style={{ width: 140 }}>Hospital</th>
-                    <th style={{ width: 95 }}>Age / Sex</th>
+                    <th style={{ width: 130 }}>Primary Study</th>
+                    <th style={{ width: 130 }}>Hospital</th>
+                    <th style={{ width: 90 }}>Age / Sex</th>
                     <th style={{ width: 100 }}>FFPE Block</th>
                     <th style={{ width: 120 }}>Pathology Scores</th>
-                    <th style={{ width: 100 }}>Images</th>
-                    <th style={{ width: 110 }}>Qualification</th>
+                    <th style={{ width: 90 }}>Images</th>
+                    <th onClick={() => setPreRebootSort('qualification_status')} style={{ width: 130, cursor: 'pointer' }}>
+                      Qualification {preRebootSortCol === 'qualification_status' ? (preRebootSortAsc ? '▲' : '▼') : '⇅'}
+                    </th>
+                    <th onClick={() => setPreRebootSort('final_qualification')} style={{ width: 140, cursor: 'pointer' }}>
+                      Final Qualification {preRebootSortCol === 'final_qualification' ? (preRebootSortAsc ? '▲' : '▼') : '⇅'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -326,8 +359,24 @@ export default function PreRebootExplorer() {
                           </td>
                           <td>
                             {r.qualification_status ? (
-                              <span className="ind-pill" style={{ background: '#F1F5F9', color: '#475569', borderColor: '#CBD5E1' }}>
+                              <span 
+                                className="ind-pill" 
+                                style={{ 
+                                  background: r.qualification_status.toLowerCase().includes('attrition') ? '#FEF2F2' : '#F1F5F9', 
+                                  color: r.qualification_status.toLowerCase().includes('attrition') ? '#B91C1C' : '#475569', 
+                                  borderColor: r.qualification_status.toLowerCase().includes('attrition') ? '#FECACA' : '#CBD5E1' 
+                                }}
+                              >
                                 {r.qualification_status}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            {r.final_qualification ? (
+                              <span className="ind-pill" style={{ background: '#F0FDF4', color: '#166534', borderColor: '#BBF7D0' }}>
+                                {r.final_qualification}
                               </span>
                             ) : (
                               <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
@@ -338,7 +387,7 @@ export default function PreRebootExplorer() {
                         {/* Expanded Detail Row */}
                         {isOpen && (
                           <tr className="detail-row">
-                            <td colSpan={13}>
+                            <td colSpan={14}>
                               <div className="detail-inner">
                                 <div className="meta-block">
                                   <div className="detail-title">Clinical & Institutional Details</div>
@@ -367,6 +416,7 @@ export default function PreRebootExplorer() {
                                     <div className="mf"><span className="mk">T72 Images</span><span className="mv">{r.t72_images || '—'}</span></div>
                                     <div className="mf"><span className="mk">T72 Markers</span><span className="mv">{r.markers_t72 || '—'}</span></div>
                                     <div className="mf"><span className="mk">Qualification Status</span><span className="mv">{r.qualification_status || '—'}</span></div>
+                                    <div className="mf"><span className="mk">Final Qualification</span><span className="mv">{r.final_qualification || '—'}</span></div>
                                     <div className="mf"><span className="mk">Study Name / Code</span><span className="mv">{r.study_name || r.study_1 || r.study_2 || '—'}</span></div>
                                     <div className="mf"><span className="mk">Comments / Notes</span><span className="mv">{r.comments || r.column3 || '—'}</span></div>
                                   </div>

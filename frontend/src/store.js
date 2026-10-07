@@ -39,6 +39,8 @@ const DEFAULT_PRE_REBOOT_FILTERS = {
   primary_study: [],
   hospital: [],
   year: [],
+  qualification_status: [],
+  final_qualification: [],
   ffpe_block: false,
   scored_only: false,
 }
@@ -52,6 +54,8 @@ function buildPreRebootQS(filters, page = 0, pageSize = 50, sortCol = 'mbt', sor
   arr('primary_study', filters.primary_study)
   arr('hospital', filters.hospital)
   arr('year', filters.year)
+  arr('qualification_status', filters.qualification_status)
+  arr('final_qualification', filters.final_qualification)
   if (filters.ffpe_block) p.set('ffpe_block', 'true')
   if (filters.scored_only) p.set('scored_only', 'true')
   p.set('page', page)

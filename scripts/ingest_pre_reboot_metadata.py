@@ -49,12 +49,17 @@ def main():
         'Markers2': 'markers_t72',
         'T0 Score': 't0_score',
         'T72 Score': 't72_score',
+        'Final Qualification': 'final_qualification',
+        'final qualification': 'final_qualification',
         'Qualification Status': 'qualification_status',
         'Comments': 'comments',
         'Column3': 'column3'
     }
     
     df = df.rename(columns={k: v for k, v in col_mapping.items() if k in df.columns})
+    
+    if 'final_qualification' not in df.columns:
+        df['final_qualification'] = ''
     
     # Format fields as strings / clean nulls
     for c in df.columns:
@@ -64,6 +69,11 @@ def main():
             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0).astype(int).astype(str).replace('0', '')
         else:
             df[c] = df[c].astype(str).str.strip().replace({'nan': '', 'None': '', 'NaT': '', 'NaN': ''})
+
+    # Move '1st level attrition' from primary_study to qualification_status and set primary_study to 'NA'
+    attrition_mask = df['primary_study'].astype(str).str.strip().str.lower() == '1st level attrition'
+    df.loc[attrition_mask, 'qualification_status'] = '1st level attrition'
+    df.loc[attrition_mask, 'primary_study'] = 'NA'
     
     engine = create_engine(DEFAULT_DB_URL)
     with engine.begin() as conn:
@@ -99,6 +109,7 @@ def main():
                 t0_score TEXT,
                 t72_score TEXT,
                 qualification_status TEXT,
+                final_qualification TEXT,
                 comments TEXT,
                 column3 TEXT
             );
@@ -109,6 +120,8 @@ def main():
             CREATE INDEX IF NOT EXISTS idx_pre_reboot_year ON pre_reboot_metadata(year);
             CREATE INDEX IF NOT EXISTS idx_pre_reboot_study ON pre_reboot_metadata(primary_study);
             CREATE INDEX IF NOT EXISTS idx_pre_reboot_hospital ON pre_reboot_metadata(hospital);
+            CREATE INDEX IF NOT EXISTS idx_pre_reboot_qual ON pre_reboot_metadata(qualification_status);
+            CREATE INDEX IF NOT EXISTS idx_pre_reboot_final_qual ON pre_reboot_metadata(final_qualification);
         """))
     
     print("Ingesting rows in batches...")
