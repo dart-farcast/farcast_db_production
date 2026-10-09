@@ -56,20 +56,24 @@ def init_auth_db():
                 is_whitelisted INTEGER NOT NULL DEFAULT 0,
                 allowed_studies TEXT NOT NULL DEFAULT '*',
                 allowed_samples TEXT NOT NULL DEFAULT '*',
+                can_download INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP
             )
         """)
         
-        # Safeguard for allowed_samples column migration
+        # Safeguard for allowed_samples and can_download column migrations
         try:
             if getattr(db, 'is_postgres', False):
                 cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_samples TEXT NOT NULL DEFAULT '*'")
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS can_download INTEGER NOT NULL DEFAULT 0")
             else:
                 cursor.execute("PRAGMA table_info(users)")
                 cols = [col['name'] for col in cursor.fetchall()]
                 if 'allowed_samples' not in cols:
                     cursor.execute("ALTER TABLE users ADD COLUMN allowed_samples TEXT NOT NULL DEFAULT '*'")
+                if 'can_download' not in cols:
+                    cursor.execute("ALTER TABLE users ADD COLUMN can_download INTEGER NOT NULL DEFAULT 0")
             db.commit()
         except Exception:
             db.rollback()

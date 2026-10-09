@@ -70,7 +70,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples FROM users WHERE email = ?", (email,))
+        cursor.execute("SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples, can_download FROM users WHERE email = ?", (email,))
         user = cursor.fetchone()
         if not user:
             raise HTTPException(status_code=401, detail="User account not found.")
@@ -90,6 +90,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         else:
             user_dict['allowed_samples'] = '*'
 
+        # Parse download access (admins always have download access)
+        user_dict['can_download'] = bool(user_dict.get('can_download', 0)) or user_dict.get('role') == 'admin'
+
         # Re-check whitelist dynamically
         if not user_dict['is_whitelisted'] and is_email_whitelisted(user_dict['email']):
             cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE email = ?", (user_dict['email'],))
@@ -105,6 +108,15 @@ def get_current_whitelisted_user(current_user: dict = Depends(get_current_user))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your email address has not been whitelisted by an administrator yet."
+        )
+    return current_user
+
+def get_current_download_authorized_user(current_user: dict = Depends(get_current_whitelisted_user)):
+    """Dependency ensuring user is allowed to download and export datasets."""
+    if not current_user.get("can_download") and current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Download access is restricted. Please contact an administrator to grant download permissions for your account."
         )
     return current_user
 

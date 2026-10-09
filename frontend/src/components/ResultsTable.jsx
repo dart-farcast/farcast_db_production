@@ -16,7 +16,7 @@ const COLS = [
 ]
 
 export default function ResultsTable() {
-  const { results, assayCols, total, loading, filters, authFetch } = useStore()
+  const { user, results, assayCols, total, loading, filters, authFetch } = useStore()
   const selectedAssays = filters?.assay || []
   const activeFilters  = filters || {}
   const [openRows, setOpenRows]   = useState(new Set())
@@ -26,7 +26,13 @@ export default function ResultsTable() {
   const [downloadingCohort, setDownloadingCohort] = useState(false)
   const PAGE = 50
 
+  const canDownload = Boolean(user?.role === 'admin' || user?.can_download)
+
   const downloadCohortExcel = async () => {
+    if (!canDownload) {
+      alert("Download access is restricted. An administrator must grant download permissions for your account.")
+      return
+    }
     if (!results || results.length === 0) return
     setDownloadingCohort(true)
     try {
@@ -270,11 +276,20 @@ export default function ResultsTable() {
 
           <button 
              className="dl-btn" 
-             style={{ marginLeft: pages > 1 ? 8 : 0, background: 'var(--accent)', color: '#000', border: 'none', padding: '4px 12px' }}
+             style={{ 
+               marginLeft: pages > 1 ? 8 : 0, 
+               background: !canDownload ? '#E5E7EB' : 'var(--accent)', 
+               color: !canDownload ? '#6B7280' : '#000', 
+               border: 'none', 
+               padding: '4px 12px',
+               cursor: !canDownload ? 'not-allowed' : 'pointer',
+               opacity: !canDownload ? 0.8 : 1
+             }}
              onClick={downloadCohortExcel}
              disabled={downloadingCohort}
+             title={!canDownload ? "Download access restricted. Contact an Administrator to request permission." : "Download Assay Cohort Data"}
           >
-            {downloadingCohort ? 'Downloading...' : '↓ Download Cohort Data (Assay Wise)'}
+            {downloadingCohort ? 'Downloading...' : !canDownload ? '🔒 Download Cohort Data (Assay Wise)' : '↓ Download Cohort Data (Assay Wise)'}
           </button>
 
           <span style={{ marginLeft: 'auto' }}>

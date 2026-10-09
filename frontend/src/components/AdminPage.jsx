@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [isUnrestrictedStudies, setIsUnrestrictedStudies] = useState(true)
   const [isUnrestrictedSamples, setIsUnrestrictedSamples] = useState(true)
   const [sampleInputText, setSampleInputText] = useState('')
+  const [canDownloadAccess, setCanDownloadAccess] = useState(false)
 
   // General UI state
   const [loading, setLoading] = useState(false)
@@ -176,6 +177,7 @@ export default function AdminPage() {
   // Open modal for editing study & sample access
   const openPermissionsModal = (user) => {
     setEditingUser(user)
+    setCanDownloadAccess(Boolean(user.can_download))
     if (user.allowed_studies === '*' || !Array.isArray(user.allowed_studies)) {
       setIsUnrestrictedStudies(true)
       setSelectedStudies(availableStudies)
@@ -226,7 +228,8 @@ export default function AdminPage() {
 
     const payload = {
       allowed_studies: finalStudies,
-      allowed_samples: finalSamples
+      allowed_samples: finalSamples,
+      can_download: Boolean(canDownloadAccess)
     }
 
     const success = await handleUserUpdate(editingUser.id, payload)
@@ -461,6 +464,7 @@ export default function AdminPage() {
                   <th>User Profile</th>
                   <th>Role</th>
                   <th>Account Status</th>
+                  <th>Download Access</th>
                   <th>Study Access</th>
                   <th>Sample Access Scope</th>
                   <th>Created At</th>
@@ -496,6 +500,22 @@ export default function AdminPage() {
                         <span className={`status-badge ${u.is_whitelisted ? 'approved' : 'pending'}`}>
                           {u.is_whitelisted ? '✅ Approved' : '⏳ Pending Whitelist'}
                         </span>
+                      </td>
+                      <td>
+                        {u.role === 'admin' ? (
+                          <span className="scope-badge unrestricted" title="Admins automatically have download and export access">
+                            📥 Full Access
+                          </span>
+                        ) : (
+                          <button
+                            className={`status-badge ${u.can_download ? 'approved' : 'pending'}`}
+                            style={{ cursor: 'pointer', border: 'none', padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => handleUserUpdate(u.id, { can_download: !u.can_download })}
+                            title="Click to toggle data download permission for this user"
+                          >
+                            {u.can_download ? '📥 Allowed' : '🔒 Restricted'}
+                          </button>
+                        )}
                       </td>
                       <td>
                         <div className="study-scope-cell">
@@ -843,6 +863,44 @@ export default function AdminPage() {
                     })()}
                   </div>
                 )}
+              </div>
+
+              {/* SECTION 3: Download & Export Permissions */}
+              <div className="rbac-section-block" style={{ marginTop: '20px' }}>
+                <div className="rbac-section-title">
+                  <span>📥 3. Data Download & Export Access</span>
+                </div>
+                <div className="access-toggle-box">
+                  <label className={`toggle-option ${canDownloadAccess ? 'active' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="downloadAccessMode" 
+                      checked={canDownloadAccess}
+                      onChange={() => setCanDownloadAccess(true)}
+                    />
+                    <div>
+                      <strong>📥 Download Access Granted</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        User is authorized to export Excel/CSV reports from Bio-Repository and download Cohort datasets.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className={`toggle-option ${!canDownloadAccess ? 'active' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="downloadAccessMode" 
+                      checked={!canDownloadAccess}
+                      onChange={() => setCanDownloadAccess(false)}
+                    />
+                    <div>
+                      <strong>🔒 Download Access Restricted</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        User can browse and query data in the UI, but cannot download or export files without admin permission.
+                      </p>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 

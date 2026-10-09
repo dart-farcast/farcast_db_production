@@ -86,17 +86,35 @@ async function downloadAssaysExcel(sid, meta, arms, authFetch, activeFilters = {
 
 /* ── ExpandedRow ─────────────────────────────────────────────────────────── */
 export default function ExpandedRow({ row, assayCols, colSpan, selectedAssays = [], activeFilters = {} }) {
-  const { authFetch } = useStore()
+  const { user, authFetch } = useStore()
   const [clickedAssay, setClickedAssay] = useState(null)
   const [fetchedRows,  setFetchedRows]  = useState(null)
   const [fetchedCols,  setFetchedCols]  = useState([])
   const [fetchLoading, setFetchLoading] = useState(false)
+
+  const canDownload = Boolean(user?.role === 'admin' || user?.can_download)
 
   const meta          = row.metadata       || {}
   const arms          = row.arms           || []
   const assayRows     = row.assay_rows     || []
   const assaysPresent = row.assays_present || []
   const sid           = meta.Sample_ID     || ''
+
+  const handleDownloadCSV = () => {
+    if (!canDownload) {
+      alert("Download access is restricted. An administrator must grant download permissions for your account.")
+      return
+    }
+    downloadCSV(meta, sid)
+  }
+
+  const handleDownloadAssays = () => {
+    if (!canDownload) {
+      alert("Download access is restricted. An administrator must grant download permissions for your account.")
+      return
+    }
+    downloadAssaysExcel(sid, meta, arms, authFetch, activeFilters)
+  }
 
   // Collect all active search terms for highlighting
   const hlTerms = [
@@ -298,11 +316,28 @@ export default function ExpandedRow({ row, assayCols, colSpan, selectedAssays = 
           <div>
             <div className="detail-title">Download — {sid}</div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <button className="dl-btn" onClick={() => downloadCSV(meta, sid)}>
-                ↓ Metadata CSV
+              <button 
+                className="dl-btn" 
+                onClick={handleDownloadCSV}
+                title={!canDownload ? "Download access restricted. Contact an Administrator to request permission." : "Download Metadata CSV"}
+                style={!canDownload ? { opacity: 0.8, cursor: 'not-allowed', background: '#F3F4F6', color: '#6B7280', borderColor: '#D1D5DB' } : {}}
+              >
+                {!canDownload ? '🔒 Metadata CSV' : '↓ Metadata CSV'}
               </button>
-              <button className="dl-btn" style={{ background: 'var(--accent)', color: '#FFFFFF', border: 'none', fontWeight: 600 }} onClick={() => downloadAssaysExcel(sid, meta, arms, authFetch, activeFilters)}>
-                ↓ Assay Data (Excel)
+              <button 
+                className="dl-btn" 
+                style={{ 
+                  background: !canDownload ? '#E5E7EB' : 'var(--accent)', 
+                  color: !canDownload ? '#6B7280' : '#FFFFFF', 
+                  border: 'none', 
+                  fontWeight: 600,
+                  cursor: !canDownload ? 'not-allowed' : 'pointer',
+                  opacity: !canDownload ? 0.8 : 1
+                }} 
+                onClick={handleDownloadAssays}
+                title={!canDownload ? "Download access restricted. Contact an Administrator to request permission." : "Download Assay Data Excel"}
+              >
+                {!canDownload ? '🔒 Assay Data (Excel)' : '↓ Assay Data (Excel)'}
               </button>
             </div>
           </div>

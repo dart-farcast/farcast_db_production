@@ -54,7 +54,8 @@ def register(req: RegisterRequest):
         "role": "user",
         "is_whitelisted": bool(whitelisted),
         "allowed_studies": "*",
-        "allowed_samples": "*"
+        "allowed_samples": "*",
+        "can_download": False
     }
 
     token = create_access_token({"sub": email_clean, "role": "user", "is_whitelisted": bool(whitelisted)})
@@ -103,6 +104,8 @@ def login(req: LoginRequest):
     else:
         allowed_samples = "*"
 
+    can_download = bool(user_dict.get("can_download", 0)) or user_dict.get("role") == "admin"
+
     token_data = {
         "sub": email_clean,
         "id": user_dict["id"],
@@ -121,7 +124,8 @@ def login(req: LoginRequest):
             "role": user_dict["role"],
             "is_whitelisted": bool(is_whitelisted),
             "allowed_studies": allowed_studies,
-            "allowed_samples": allowed_samples
+            "allowed_samples": allowed_samples,
+            "can_download": can_download
         }
     }
 

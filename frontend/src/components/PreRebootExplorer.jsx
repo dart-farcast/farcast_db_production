@@ -5,6 +5,7 @@ import MultiSelect from './MultiSelect'
 
 export default function PreRebootExplorer() {
   const {
+    user,
     preRebootFilters, preRebootResults, preRebootTotal,
     preRebootPage, preRebootPageSize, preRebootTotalPages,
     preRebootSortCol, preRebootSortAsc, preRebootLoading,
@@ -15,6 +16,8 @@ export default function PreRebootExplorer() {
 
   const [openRows, setOpenRows] = useState(new Set())
   const [downloadingExcel, setDownloadingExcel] = useState(false)
+
+  const canDownload = Boolean(user?.role === 'admin' || user?.can_download)
 
   // Load initial stats & search on mount
   useEffect(() => {
@@ -35,6 +38,11 @@ export default function PreRebootExplorer() {
   }
 
   const handleDownloadExcel = async () => {
+    if (!canDownload) {
+      alert("Download access is restricted. An administrator must grant download permissions for your account.")
+      return
+    }
+
     setDownloadingExcel(true)
     try {
       // Fetch up to 1000 matching rows for export
@@ -245,8 +253,10 @@ export default function PreRebootExplorer() {
               className="dl-btn"
               onClick={handleDownloadExcel}
               disabled={downloadingExcel || preRebootTotal === 0}
+              title={!canDownload ? "Download access restricted. Contact an Administrator to request permission." : "Export matching Bio-Repository records to Excel"}
+              style={!canDownload ? { opacity: 0.8, cursor: 'not-allowed', background: '#F3F4F6', color: '#6B7280', borderColor: '#D1D5DB' } : {}}
             >
-              {downloadingExcel ? 'Exporting...' : '📥 Export to Excel'}
+              {downloadingExcel ? 'Exporting...' : !canDownload ? '🔒 Export to Excel' : '📥 Export to Excel'}
             </button>
           </div>
         </div>
@@ -389,36 +399,12 @@ export default function PreRebootExplorer() {
                           <tr className="detail-row">
                             <td colSpan={14}>
                               <div className="detail-inner">
-                                <div className="meta-block">
-                                  <div className="detail-title">Clinical & Institutional Details</div>
-                                  <div className="meta-grid">
-                                    <div className="mf"><span className="mk">MBT ID</span><span className="mv">{r.mbt}</span></div>
-                                    <div className="mf"><span className="mk">Collection Year</span><span className="mv">{r.year}</span></div>
-                                    <div className="mf"><span className="mk">Collection Date</span><span className="mv">{r.collection_date || r.month || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Hospital</span><span className="mv">{r.hospital || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Relationship Name</span><span className="mv">{r.relationship_name || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Type of Relationship</span><span className="mv">{r.type_of_relationship || '—'}</span></div>
+                                <div className="meta-block" style={{ maxWidth: 520 }}>
+                                  <div className="detail-title">Sample Details</div>
+                                  <div className="meta-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                    <div className="mf"><span className="mk">Collection Year</span><span className="mv">{r.year || '—'}</span></div>
+                                    <div className="mf"><span className="mk">MBT ID</span><span className="mv" style={{ color: '#D97706', fontWeight: 700 }}>{r.mbt || '—'}</span></div>
                                     <div className="mf"><span className="mk">Physician</span><span className="mv">{r.physician || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Procedure Type</span><span className="mv">{r.procedure_type || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Sample Type</span><span className="mv">{r.sample_type || '—'}</span></div>
-                                    <div className="mf"><span className="mk">pTNM</span><span className="mv">{r.ptnm || '—'}</span></div>
-                                  </div>
-                                </div>
-
-                                <div className="meta-block">
-                                  <div className="detail-title">Pathology Metrics, Images & Scoring</div>
-                                  <div className="meta-grid">
-                                    <div className="mf"><span className="mk">FFPE Block Availability</span><span className="mv">{r.ffpe_block_availability || '—'}</span></div>
-                                    <div className="mf"><span className="mk">T0 Score</span><span className="mv">{r.t0_score || '—'}</span></div>
-                                    <div className="mf"><span className="mk">T72 Score</span><span className="mv">{r.t72_score || '—'}</span></div>
-                                    <div className="mf"><span className="mk">T0 Images</span><span className="mv">{r.t0_images || '—'}</span></div>
-                                    <div className="mf"><span className="mk">T0 Markers</span><span className="mv">{r.markers_t0 || '—'}</span></div>
-                                    <div className="mf"><span className="mk">T72 Images</span><span className="mv">{r.t72_images || '—'}</span></div>
-                                    <div className="mf"><span className="mk">T72 Markers</span><span className="mv">{r.markers_t72 || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Qualification Status</span><span className="mv">{r.qualification_status || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Final Qualification</span><span className="mv">{r.final_qualification || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Study Name / Code</span><span className="mv">{r.study_name || r.study_1 || r.study_2 || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Comments / Notes</span><span className="mv">{r.comments || r.column3 || '—'}</span></div>
                                   </div>
                                 </div>
                               </div>
