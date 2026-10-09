@@ -399,12 +399,21 @@ export default function PreRebootExplorer() {
                           <tr className="detail-row">
                             <td colSpan={14}>
                               <div className="detail-inner">
-                                <div className="meta-block" style={{ maxWidth: 520 }}>
+                                <div>
                                   <div className="detail-title">Sample Details</div>
-                                  <div className="meta-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                                    <div className="mf"><span className="mk">Collection Year</span><span className="mv">{r.year || '—'}</span></div>
-                                    <div className="mf"><span className="mk">MBT ID</span><span className="mv" style={{ color: '#D97706', fontWeight: 700 }}>{r.mbt || '—'}</span></div>
-                                    <div className="mf"><span className="mk">Physician</span><span className="mv">{r.physician || '—'}</span></div>
+                                  <div className="meta-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', maxWidth: 720, gap: 12 }}>
+                                    <div className="meta-cell">
+                                      <div className="mc-label">Collection Year</div>
+                                      <div className="mc-val">{r.year || '—'}</div>
+                                    </div>
+                                    <div className="meta-cell">
+                                      <div className="mc-label">MBT ID</div>
+                                      <div className="mc-val" style={{ color: '#D97706', fontWeight: 700 }}>{r.mbt || '—'}</div>
+                                    </div>
+                                    <div className="meta-cell">
+                                      <div className="mc-label">Physician</div>
+                                      <div className="mc-val">{r.physician || '—'}</div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
