@@ -8,6 +8,7 @@ const DEFAULT_FILTERS = {
   tumor_site:     [],
   study:          [],
   project:        [],
+  year:           [],
   sample:         '',
   assay:          [],
   timepoint:      '',
@@ -24,6 +25,7 @@ function buildQS(filters) {
   arr('tumor_site', filters.tumor_site)
   arr('study',      filters.study)
   arr('project',    filters.project)
+  arr('year',       filters.year)
   arr('assay',      filters.assay)
   if (filters.sample)         p.set('sample',         filters.sample)
   if (filters.timepoint)      p.set('timepoint',      filters.timepoint)

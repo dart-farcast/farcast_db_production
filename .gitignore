@@ -63,3 +63,13 @@ investigate_root_causes.py
 requested_samples_treatment_details.csv
 DATA_TRACKING_README.md
 farcast_production_resilience_plan.md
+15oct-cohort/
+8sept_todo_cohort/
+biopharma samples/
+*.png
+*.jpeg
+*.jpg
+*.pdf
+*.lnk
+Sample Metrics Sheet*.xlsx
+

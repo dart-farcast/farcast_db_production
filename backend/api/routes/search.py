@@ -101,6 +101,7 @@ def search(
     tumor_site:     str = '',
     study:          str = '',
     project:        str = '',
+    year:           str = '',   # comma-separated years e.g. '2024,2025'
     assay:          str = '',   # comma-separated assay display names
     timepoint:      str = '',
     qualified_only: str = '',
@@ -119,6 +120,7 @@ def search(
     sites      = _parse_multi(tumor_site)
     studies    = _parse_multi(study)
     projects   = _parse_multi(project)
+    years      = _parse_multi(year)
     assay_list = _parse_multi(assay)
     is_strict  = strict_drug.strip().lower() in ('true', '1', 'yes') and bool(drugs)
 
@@ -173,6 +175,8 @@ def search(
         final_sids &= _index_match(idx['study'], studies, partial=True)
     if projects:
         final_sids &= _index_match(idx['project'], projects, partial=True)
+    if years:
+        final_sids &= _index_match(idx.get('year', {}), years, partial=False)
 
     # ── 5. Sample ID substring filter ────────────────────────────────────────
     if sample:

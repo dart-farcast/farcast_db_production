@@ -134,9 +134,16 @@ export default function Sidebar({ onSearch }) {
         <MultiSelect
           field="study"
           label="Study Type"
-          placeholder="e.g. BioBank, Biopharma, Internal R&D…"
+          placeholder="e.g. R&D, Biopharma…"
           selected={filters.study}
           onChange={v => setFilter('study', v)}
+        />
+        <MultiSelect
+          field="year"
+          label="Received Year"
+          placeholder="e.g. 2026, 2025, 2024…"
+          selected={filters.year}
+          onChange={v => setFilter('year', v)}
         />
         <MultiSelect
           field="project"

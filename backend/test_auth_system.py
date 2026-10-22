@@ -1,7 +1,9 @@
 """
 FarCast DB v2 — Auth & Whitelist System Verification Script
 """
+import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import time
 from fastapi.testclient import TestClient
 from app import app

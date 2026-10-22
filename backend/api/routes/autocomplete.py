@@ -17,6 +17,7 @@ FIELD_COL = {
     'study':      ('meta',    'Study'),
     'project':    ('meta',    'Project_ID'),
     'hospital':   ('meta',    'Hospital'),
+    'year':       ('meta',    'Year'),
 }
 
 
@@ -58,12 +59,16 @@ def autocomplete(
         if 'Sample_ID' in df.columns:
             df = df[df['Sample_ID'].isin(qual_sids)]
 
-    # If query is empty, return top most frequent values
+    # If query is empty, return top values
     if not q:
+        if field == 'year':
+            return sorted([str(v).strip() for v in df[col].dropna().unique() if str(v).strip()], reverse=True)
         top_vals = [str(v).strip() for v in df[col].replace('', None).dropna().value_counts().index if str(v).strip()]
         return top_vals[:25]
 
     vals = [str(v).strip() for v in df[col].dropna().unique() if str(v).strip()]
+    if field == 'year':
+        return sorted([v for v in vals if q in v.lower()], reverse=True)
     matches = sorted(
         {v for v in vals if q in v.lower()},
         key=lambda x: (not x.lower().startswith(q), x.lower())

@@ -4,6 +4,7 @@ Direct Database Loader: Loads multi-omics assay data, metadata, and overlay excl
 No local file fallbacks.
 """
 import os
+import re
 import pandas as pd
 from sqlalchemy import create_engine, inspect, text
 
@@ -16,6 +17,23 @@ KNOWN_ASSAYS = {
     'assay_nanostring':     'NanoString',
     'assay_mihc':           'mIHC'
 }
+
+
+def extract_year(val) -> str:
+    """Extract clean 4-digit year from date string or datetime value."""
+    if not val or pd.isna(val):
+        return ''
+    s = str(val).strip()
+    if not s or s.lower() in ('nan', 'none', 'null'):
+        return ''
+    if len(s) >= 4 and s[:4].isdigit() and 2010 <= int(s[:4]) <= 2035:
+        return s[:4]
+    if len(s) >= 4 and s[-4:].isdigit() and 2010 <= int(s[-4:]) <= 2035:
+        return s[-4:]
+    m = re.search(r'(20\d\d)', s)
+    if m:
+        return m.group(1)
+    return ''
 
 
 def clean_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -84,8 +102,19 @@ def load_metadata() -> pd.DataFrame:
         if not df.empty and 'Sample_ID' in df.columns:
             print(f"  Successfully loaded {len(df)} metadata rows from Database.")
             df = clean_df(df)
-            if 'Study' in df.columns and 'RegisterType' not in df.columns:
+            
+            # Enforce Study strictly equals RegisterType (R&D or Biopharma)
+            if 'RegisterType' in df.columns:
+                df['Study'] = df['RegisterType']
+            elif 'Study' in df.columns:
                 df['RegisterType'] = df['Study']
+
+            # Extract Received Year from 'Sample Received Date' (or fallback 'CollectionDate')
+            date_col = next((c for c in ['Sample Received Date', 'Sample_Received_Date', 'CollectionDate', 'DateOfCollection'] if c in df.columns), None)
+            if date_col:
+                df['Year'] = df[date_col].apply(extract_year)
+            else:
+                df['Year'] = ''
             return df
     except Exception as e:
         print(f"  [Metadata Loader Error] Failed loading metadata from Database: {e}")
@@ -304,6 +333,11 @@ def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict, is
     biopharma_total = int(meta[bio_mask]['Sample_ID'].nunique()) if not meta.empty else 0
     biopharma_qualified = int(meta[bio_mask & is_qual_mask]['Sample_ID'].nunique()) if not meta.empty and qual_col else 0
 
+    year_list = (sorted([str(y).strip() for y in meta['Year'].replace('', pd.NA).dropna().unique() if str(y).strip()], reverse=True)
+                 if 'Year' in meta.columns else [])
+    years_dict = (meta['Year'].replace('', pd.NA).dropna().value_counts().to_dict()
+                  if 'Year' in meta.columns else {})
+
     return {
         'samples':                total_samples,
         'qualified_samples':      qualified_samples,
@@ -318,17 +352,20 @@ def compute_stats(meta: pd.DataFrame, overlay: pd.DataFrame, assay_dfs: dict, is
         'indications':            indications,
         'top_drugs':              drugs.value_counts().head(20).index.tolist() if not drugs.empty else [],
         'study_list':             study_list,
+        'year_list':              year_list,
+        'years':                  years_dict,
     }
 
 
 def build_indexes(meta: pd.DataFrame, overlay: pd.DataFrame) -> dict:
     """Pre-build {value: set(sample_ids)} for fast multi-select search."""
-    drug_index   = {}
-    arm_index    = {}
-    cancer_index = {}
-    study_index  = {}
-    site_index   = {}
+    drug_index    = {}
+    arm_index     = {}
+    cancer_index  = {}
+    study_index   = {}
+    site_index    = {}
     project_index = {}
+    year_index    = {}
 
     for _, row in overlay.iterrows():
         d = row['Drug'].strip()
@@ -340,7 +377,8 @@ def build_indexes(meta: pd.DataFrame, overlay: pd.DataFrame) -> dict:
             arm_index.setdefault(a.lower(), set()).add(s)
 
     for col, idx in [('CancerType', cancer_index), ('Study', study_index),
-                     ('TumorSite', site_index),    ('Project_ID', project_index)]:
+                     ('TumorSite', site_index),    ('Project_ID', project_index),
+                     ('Year', year_index)]:
         if col not in meta.columns:
             continue
         for _, row in meta.iterrows():
@@ -364,6 +402,7 @@ def build_indexes(meta: pd.DataFrame, overlay: pd.DataFrame) -> dict:
         'study':          study_index,
         'site':           site_index,
         'project':        project_index,
+        'year':           year_index,
         'all_sids':       all_sids,
         'qualified_sids': qualified_sids,
     }

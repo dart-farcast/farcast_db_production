@@ -6,6 +6,7 @@ import ExpandedRow from './ExpandedRow'
 const COLS = [
   { key: 'toggle',            label: '',                         w: 28  },
   { key: 'Sample_ID',         label: 'Sample ID',                w: 130 },
+  { key: 'Year',              label: 'Received Year',            w: 100 },
   { key: 'CancerType',        label: 'Indication',               w: 120 },
   { key: 'Study',             label: 'Study Type',               w: 110 },
   { key: 'TumorSite',         label: 'Tumor Site',               w: 110 },
@@ -171,6 +172,9 @@ export default function ResultsTable() {
                       <span className="toggle-icon">›</span>
                     </td>
                     <td className="td-sid">{sid}</td>
+                    <td style={{ color: 'var(--text-light)', fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500 }}>
+                      {row.metadata?.Year || '—'}
+                    </td>
                     <td>
                       {row.metadata?.CancerType
                         ? <span className="ind-pill">{row.metadata.CancerType}</span>
