@@ -1,7 +1,13 @@
 from typing import Optional, List, Union
+import secrets
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from ..auth import get_db, get_current_admin_user, is_email_whitelisted
+from ..auth import (
+    get_db, get_current_admin_user, is_email_whitelisted,
+    hash_password, create_security_notification,
+    get_all_login_history, get_user_login_history
+)
 from ..cache import cache
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -13,9 +19,23 @@ class AddWhitelistRequest(BaseModel):
 class UpdateUserRequest(BaseModel):
     role: Optional[str] = None
     is_whitelisted: Optional[bool] = None
+    is_active: Optional[bool] = None
+    is_verified: Optional[bool] = None
     allowed_studies: Optional[Union[List[str], str]] = None
     allowed_samples: Optional[Union[List[str], str]] = None
     can_download: Optional[bool] = None
+
+class InviteUserRequest(BaseModel):
+    email: str
+    full_name: Optional[str] = ""
+    role: Optional[str] = "user"
+    allowed_studies: Optional[Union[List[str], str]] = "*"
+    allowed_samples: Optional[Union[List[str], str]] = "*"
+    can_download: Optional[bool] = False
+    temporary_password: Optional[str] = None
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: Optional[str] = None
 
 def log_audit(actor_email: str, action: str, details: str):
     try:
@@ -112,7 +132,9 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples, can_download, created_at, last_login
+            SELECT id, email, full_name, role, is_whitelisted, is_active, is_verified,
+                   allowed_studies, allowed_samples, can_download, deactivated_at,
+                   deactivation_reason, created_at, last_login
             FROM users
             ORDER BY id ASC
         """)
@@ -140,10 +162,14 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
             "email": u_dict["email"],
             "full_name": u_dict["full_name"],
             "role": u_dict["role"],
-            "is_whitelisted": bool(u_dict["is_whitelisted"]),
+            "is_whitelisted": bool(u_dict.get("is_whitelisted", 0)),
+            "is_active": bool(u_dict.get("is_active", 1)),
+            "is_verified": bool(u_dict.get("is_verified", 0)),
             "allowed_studies": allowed_studies,
             "allowed_samples": allowed_samples,
             "can_download": can_download,
+            "deactivated_at": u_dict.get("deactivated_at"),
+            "deactivation_reason": u_dict.get("deactivation_reason"),
             "created_at": u_dict["created_at"],
             "last_login": u_dict["last_login"]
         })
@@ -152,12 +178,78 @@ def list_users(current_admin: dict = Depends(get_current_admin_user)):
         "users": user_list
     }
 
+@router.post("/invite")
+def invite_user(req: InviteUserRequest, current_admin: dict = Depends(get_current_admin_user)):
+    """Allows an administrator to securely create/invite a user with designated role and permissions."""
+    email_clean = req.email.strip().lower()
+    if not email_clean or "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    role = req.role if req.role in ['admin', 'manager', 'analyst', 'user'] else 'user'
+    temp_password = req.temporary_password.strip() if req.temporary_password else secrets.token_urlsafe(9)
+    hashed_pw = hash_password(temp_password)
+
+    # Process allowed studies
+    if isinstance(req.allowed_studies, list):
+        studies_val = '*' if ('*' in req.allowed_studies or len(req.allowed_studies) == 0) else ','.join(req.allowed_studies)
+    else:
+        studies_val = str(req.allowed_studies).strip() or '*'
+
+    # Process allowed samples
+    if isinstance(req.allowed_samples, list):
+        samples_val = '*' if ('*' in req.allowed_samples or len(req.allowed_samples) == 0) else ','.join([s.strip() for s in req.allowed_samples if s.strip()])
+    else:
+        samples_val = str(req.allowed_samples).strip() or '*'
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email_clean,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail=f"User with email '{email_clean}' already exists.")
+
+        cursor.execute("""
+            INSERT INTO users (email, full_name, password_hash, role, is_whitelisted, is_active, is_verified, allowed_studies, allowed_samples, can_download)
+            VALUES (?, ?, ?, ?, TRUE, TRUE, TRUE, ?, ?, ?)
+        """, (email_clean, req.full_name.strip(), hashed_pw, role, studies_val, samples_val, int(bool(req.can_download))))
+        conn.commit()
+        cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email_clean,))
+        row_id = cursor.fetchone()
+        user_id = row_id["id"] if row_id else cursor.lastrowid
+
+        # Also auto-whitelist email pattern if not present
+        try:
+            cursor.execute("INSERT INTO whitelisted_emails (pattern, added_by, notes) VALUES (?, ?, ?)",
+                           (email_clean, current_admin["email"], f"Invited user account ({role})"))
+            conn.commit()
+        except Exception:
+            pass
+
+    log_audit(current_admin["email"], "INVITE_USER", f"Invited user {email_clean} with role '{role}'")
+    create_security_notification(
+        email_clean,
+        "🎉 Welcome to FarCast Platform",
+        f"You have been invited by {current_admin['email']} with the role '{role}'.",
+        "account"
+    )
+
+    return {
+        "success": True,
+        "message": f"User '{email_clean}' successfully created & whitelisted.",
+        "user_id": user_id,
+        "email": email_clean,
+        "role": role,
+        "temporary_password": temp_password
+    }
 
 @router.patch("/users/{user_id}")
 def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depends(get_current_admin_user)):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, email, role, is_whitelisted, allowed_studies, allowed_samples, can_download FROM users WHERE id = ?", (user_id,))
+        cursor.execute("""
+            SELECT id, email, role, is_whitelisted, is_active, is_verified, 
+                   allowed_studies, allowed_samples, can_download 
+            FROM users WHERE id = ?
+        """, (user_id,))
         target_user = cursor.fetchone()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found.")
@@ -166,13 +258,29 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
         updates = []
         params = []
 
-        if req.role is not None and req.role in ['admin', 'user']:
+        if req.role is not None and req.role in ['admin', 'manager', 'analyst', 'user']:
             updates.append("role = ?")
             params.append(req.role)
 
         if req.is_whitelisted is not None:
             updates.append("is_whitelisted = ?")
             params.append(bool(req.is_whitelisted))
+
+        if req.is_active is not None:
+            updates.append("is_active = ?")
+            params.append(bool(req.is_active))
+            if not req.is_active:
+                updates.append("deactivated_at = ?")
+                params.append(datetime.utcnow().isoformat())
+                updates.append("deactivation_reason = ?")
+                params.append(f"Suspended by administrator {current_admin['email']}")
+            else:
+                updates.append("deactivated_at = NULL")
+                updates.append("deactivation_reason = NULL")
+
+        if req.is_verified is not None:
+            updates.append("is_verified = ?")
+            params.append(bool(req.is_verified))
 
         if req.allowed_studies is not None:
             if isinstance(req.allowed_studies, list):
@@ -208,11 +316,81 @@ def update_user(user_id: int, req: UpdateUserRequest, current_admin: dict = Depe
         conn.commit()
 
     log_audit(current_admin["email"], "UPDATE_USER", 
-              f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, whitelisted={req.is_whitelisted}, allowed_studies={req.allowed_studies}, allowed_samples={req.allowed_samples}, can_download={req.can_download}")
+              f"Updated user ID {user_id} ({target_dict['email']}): role={req.role}, active={req.is_active}, verified={req.is_verified}, whitelisted={req.is_whitelisted}")
+
+    create_security_notification(
+        target_dict['email'],
+        "🛡️ Account Settings Updated",
+        f"Your account status and permissions were updated by administrator {current_admin['email']}.",
+        "security"
+    )
 
     return {
         "success": True,
         "message": f"User {target_dict['email']} updated successfully."
+    }
+
+@router.post("/users/{user_id}/reset-password")
+def admin_reset_user_password(user_id: int, req: AdminResetPasswordRequest, current_admin: dict = Depends(get_current_admin_user)):
+    """Administrator triggers password reset or generates temporary password for user."""
+    temp_password = req.new_password.strip() if req.new_password else secrets.token_urlsafe(9)
+    if len(temp_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, email FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User account not found.")
+
+        target_email = row['email']
+        hashed_pw = hash_password(temp_password)
+        now_iso = datetime.utcnow().isoformat()
+        cursor.execute("""
+            UPDATE users 
+            SET password_hash = ?, failed_login_attempts = 0, last_password_change = ? 
+            WHERE id = ?
+        """, (hashed_pw, now_iso, user_id))
+        conn.commit()
+
+    log_audit(current_admin["email"], "ADMIN_RESET_PASSWORD", f"Administrator reset password for user {target_email}")
+    create_security_notification(
+        target_email,
+        "🔒 Account Password Reset",
+        f"Your account password was reset by administrator {current_admin['email']}.",
+        "password"
+    )
+
+    return {
+        "success": True,
+        "message": f"Password reset successfully for '{target_email}'.",
+        "temporary_password": temp_password
+    }
+
+@router.get("/users/{user_id}/login-history")
+def get_user_logins(user_id: int, current_admin: dict = Depends(get_current_admin_user)):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+        email = row['email']
+
+    history = get_user_login_history(email, limit=50)
+    return {
+        "success": True,
+        "email": email,
+        "history": [dict(h) for h in history]
+    }
+
+@router.get("/login-history")
+def get_global_login_history(current_admin: dict = Depends(get_current_admin_user)):
+    history = get_all_login_history(limit=100)
+    return {
+        "success": True,
+        "history": [dict(h) for h in history]
     }
 
 @router.delete("/users/{user_id}")
@@ -276,6 +454,7 @@ async def sync_database(current_admin: dict = Depends(get_current_admin_user)):
         "overlay_len": len(cache.overlay),
         "assays": {k: len(v) for k, v in cache.assay_dfs.items()}
     }
+
 
 
 

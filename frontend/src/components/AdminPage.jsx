@@ -3,25 +3,31 @@ import { useStore } from '../store'
 
 export default function AdminPage() {
   const { authFetch, setCurrentView, updateUser, user: currentUser, setStats } = useStore()
-  const [activeTab, setActiveTab] = useState('users') // 'users' | 'whitelist' | 'audit'
+  const [activeTab, setActiveTab] = useState('users') // 'users' | 'whitelist' | 'audit' | 'logins'
 
   // Data state
   const [whitelist, setWhitelist] = useState([])
   const [users, setUsers] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [availableStudies, setAvailableStudies] = useState([])
+  const [globalLoginHistory, setGlobalLoginHistory] = useState([])
+  const [loadingLogins, setLoadingLogins] = useState(false)
 
   // Database Sync state
   const [syncingDb, setSyncingDb] = useState(false)
 
-  // Form states
+  // Form states for Whitelist
   const [newPattern, setNewPattern] = useState('')
   const [newNotes, setNewNotes] = useState('')
 
   // Search & Filter state for user table
   const [userSearch, setUserSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'approved' | 'scoped'
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'approved' | 'active' | 'suspended' | 'verified' | 'unverified' | 'study_scoped' | 'sample_scoped'
+
+  // Search & Filter for Login History table
+  const [loginSearch, setLoginSearch] = useState('')
+  const [loginStatusFilter, setLoginStatusFilter] = useState('all')
 
   // Modal State for Study & Sample Permissions
   const [editingUser, setEditingUser] = useState(null)
@@ -30,6 +36,20 @@ export default function AdminPage() {
   const [isUnrestrictedSamples, setIsUnrestrictedSamples] = useState(true)
   const [sampleInputText, setSampleInputText] = useState('')
   const [canDownloadAccess, setCanDownloadAccess] = useState(false)
+
+  // Modal State for Invite User
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteFullName, setInviteFullName] = useState('')
+  const [inviteRole, setInviteRole] = useState('user')
+  const [inviteCanDownload, setInviteCanDownload] = useState(false)
+  const [inviteTempPassword, setInviteTempPassword] = useState('')
+
+  // Modal State for Generated Credentials / Password
+  const [credentialsModal, setCredentialsModal] = useState(null) // { email, role, temporary_password, title }
+
+  // Modal State for Specific User Login History
+  const [userLoginModal, setUserLoginModal] = useState(null) // { email, history }
 
   // General UI state
   const [loading, setLoading] = useState(false)
@@ -93,9 +113,30 @@ export default function AdminPage() {
     }
   }
 
+  const loadGlobalLogins = async () => {
+    setLoadingLogins(true)
+    try {
+      const res = await authFetch('/api/admin/login-history')
+      const data = await res.json()
+      if (data.success && Array.isArray(data.history)) {
+        setGlobalLoginHistory(data.history)
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setLoadingLogins(false)
+    }
+  }
+
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'logins') {
+      loadGlobalLogins()
+    }
+  }, [activeTab])
 
   const handleAddWhitelist = async (e) => {
     e.preventDefault()
@@ -171,6 +212,90 @@ export default function AdminPage() {
       loadData()
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
+    }
+  }
+
+  // Handle Admin User Invite
+  const handleInviteSubmit = async (e) => {
+    e.preventDefault()
+    if (!inviteEmail.trim()) return
+
+    setMsg({ type: '', text: '' })
+    setLoading(true)
+
+    try {
+      const res = await authFetch('/api/admin/invite', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: inviteEmail.trim().toLowerCase(),
+          full_name: inviteFullName.trim(),
+          role: inviteRole,
+          can_download: inviteCanDownload,
+          temporary_password: inviteTempPassword.trim() || undefined
+        })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.detail || 'Failed to invite user.')
+
+      setShowInviteModal(false)
+      setCredentialsModal({
+        title: '🎉 User Invited & Provisioned Successfully',
+        email: data.email,
+        role: data.role,
+        temporary_password: data.temporary_password,
+        note: 'Please securely provide these login credentials to the user.'
+      })
+
+      setInviteEmail('')
+      setInviteFullName('')
+      setInviteRole('user')
+      setInviteCanDownload(false)
+      setInviteTempPassword('')
+      loadData()
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle Admin Reset User Password
+  const handleAdminResetPassword = async (userId, userEmail) => {
+    if (!confirm(`Generate a new temporary password for '${userEmail}'?`)) return
+
+    setMsg({ type: '', text: '' })
+    try {
+      const res = await authFetch(`/api/admin/users/${userId}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.detail || 'Failed to reset password.')
+
+      setCredentialsModal({
+        title: '🔑 Temporary Password Generated',
+        email: userEmail,
+        temporary_password: data.temporary_password,
+        note: 'The user password has been reset. Please copy and provide this temporary password to the user.'
+      })
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message })
+    }
+  }
+
+  // Handle View User Logins
+  const handleViewUserLogins = async (userId, userEmail) => {
+    try {
+      const res = await authFetch(`/api/admin/users/${userId}/login-history`)
+      const data = await res.json()
+      if (data.success) {
+        setUserLoginModal({
+          email: userEmail,
+          history: data.history || []
+        })
+      }
+    } catch (e) {
+      alert('Failed to load login history for this user.')
     }
   }
 
@@ -250,17 +375,39 @@ export default function AdminPage() {
       statusFilter === 'all' ? true :
       statusFilter === 'pending' ? !u.is_whitelisted :
       statusFilter === 'approved' ? u.is_whitelisted :
+      statusFilter === 'active' ? u.is_active :
+      statusFilter === 'suspended' ? !u.is_active :
+      statusFilter === 'verified' ? u.is_verified :
+      statusFilter === 'unverified' ? !u.is_verified :
       statusFilter === 'study_scoped' ? (u.allowed_studies !== '*' && Array.isArray(u.allowed_studies)) :
       statusFilter === 'sample_scoped' ? (u.allowed_samples !== '*' && Array.isArray(u.allowed_samples)) : true
 
     return matchesSearch && matchesRole && matchesStatus
   })
 
+  // Filtered Login History list
+  const filteredLogins = globalLoginHistory.filter(l => {
+    const q = loginSearch.toLowerCase()
+    const matchesSearch = !q || (
+      (l.email && l.email.toLowerCase().includes(q)) ||
+      (l.ip_address && l.ip_address.toLowerCase().includes(q)) ||
+      (l.user_agent && l.user_agent.toLowerCase().includes(q))
+    )
+    const matchesStatus = loginStatusFilter === 'all' || l.status === loginStatusFilter
+    return matchesSearch && matchesStatus
+  })
+
   // Metrics
   const pendingCount = users.filter(u => !u.is_whitelisted).length
-  const adminCount = users.filter(u => u.role === 'role' || u.role === 'admin').length
+  const suspendedCount = users.filter(u => !u.is_active).length
+  const unverifiedCount = users.filter(u => !u.is_verified).length
   const studyScopedCount = users.filter(u => u.allowed_studies !== '*' && Array.isArray(u.allowed_studies)).length
   const sampleScopedCount = users.filter(u => u.allowed_samples !== '*' && Array.isArray(u.allowed_samples)).length
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    alert('Copied to clipboard!')
+  }
 
   return (
     <div className="admin-container">
@@ -276,6 +423,13 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="admin-hero-actions">
+          <button 
+            className="btn-primary-invite" 
+            onClick={() => setShowInviteModal(true)}
+            title="Invite, provision, and assign roles to new users securely"
+          >
+            ➕ Invite User
+          </button>
           <button 
             className="btn-sync-db" 
             onClick={handleSyncDatabase} 
@@ -327,6 +481,19 @@ export default function AdminPage() {
         </div>
 
         <div 
+          className={`metric-card actionable ${suspendedCount > 0 ? 'danger-card' : ''} ${activeTab === 'users' && statusFilter === 'suspended' ? 'active-card' : ''}`}
+          onClick={() => { setActiveTab('users'); setStatusFilter('suspended'); setRoleFilter('all'); setUserSearch(''); }}
+          title="Click to view suspended / deactivated accounts"
+        >
+          <div className="metric-header">
+            <span className="metric-icon">⛔</span>
+            <span className="metric-trend danger">{suspendedCount > 0 ? `${suspendedCount} Suspended` : 'All Active'}</span>
+          </div>
+          <div className="metric-val">{suspendedCount}</div>
+          <div className="metric-label">Suspended Accounts</div>
+        </div>
+
+        <div 
           className={`metric-card actionable ${activeTab === 'users' && statusFilter === 'study_scoped' ? 'active-card' : ''}`}
           onClick={() => { setActiveTab('users'); setStatusFilter('study_scoped'); setRoleFilter('all'); setUserSearch(''); }}
           title="Click to view study-scoped users"
@@ -340,57 +507,16 @@ export default function AdminPage() {
         </div>
 
         <div 
-          className={`metric-card actionable ${activeTab === 'users' && statusFilter === 'sample_scoped' ? 'active-card' : ''}`}
-          onClick={() => { setActiveTab('users'); setStatusFilter('sample_scoped'); setRoleFilter('all'); setUserSearch(''); }}
-          title="Click to view sample-scoped users"
+          className={`metric-card actionable ${activeTab === 'logins' ? 'active-card' : ''}`}
+          onClick={() => setActiveTab('logins')}
+          title="Click to view live authentication and login events"
         >
           <div className="metric-header">
-            <span className="metric-icon">🎯</span>
-            <span className="metric-trend warning">RBAC</span>
+            <span className="metric-icon">📋</span>
+            <span className="metric-trend success">Live</span>
           </div>
-          <div className="metric-val">{sampleScopedCount}</div>
-          <div className="metric-label">Sample-Scoped Users</div>
-        </div>
-
-        <div 
-          className={`metric-card actionable ${activeTab === 'whitelist' ? 'active-card' : ''}`}
-          onClick={() => setActiveTab('whitelist')}
-          title="Click to manage whitelisted email/domain patterns"
-        >
-          <div className="metric-header">
-            <span className="metric-icon">🌐</span>
-            <span className="metric-trend">Active</span>
-          </div>
-          <div className="metric-val">{whitelist.length}</div>
-          <div className="metric-label">Whitelisted Patterns</div>
-        </div>
-
-        <div 
-          className={`metric-card actionable ${activeTab === 'audit' ? 'active-card' : ''}`}
-          onClick={() => setActiveTab('audit')}
-          title="Click to view security audit logs"
-        >
-          <div className="metric-header">
-            <span className="metric-icon">📜</span>
-            <span className="metric-trend">Audit</span>
-          </div>
-          <div className="metric-val">{auditLogs.length}</div>
-          <div className="metric-label">System Security Events</div>
-        </div>
-
-        <div 
-          className="metric-card actionable"
-          onClick={handleSyncDatabase}
-          title="Click to synchronize live database cache with Supabase Cloud"
-        >
-          <div className="metric-header">
-            <span className="metric-icon">⚡</span>
-            <span className="metric-trend success">{syncingDb ? 'Syncing...' : 'Connected'}</span>
-          </div>
-          <div className="metric-val" style={{ fontSize: '18px', padding: '4px 0' }}>
-            {syncingDb ? '⏳ Syncing...' : '🔄 Sync Now'}
-          </div>
-          <div className="metric-label">Supabase Cloud Cache</div>
+          <div className="metric-val">Security</div>
+          <div className="metric-label">Login History Logs</div>
         </div>
       </div>
 
@@ -402,7 +528,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Subtabs */}
+      {/* Subtabs Navigation */}
       <div className="admin-subtabs">
         <button 
           className={`subtab-btn ${activeTab === 'users' ? 'active' : ''}`}
@@ -417,6 +543,12 @@ export default function AdminPage() {
           📧 Whitelist Registry ({whitelist.length})
         </button>
         <button 
+          className={`subtab-btn ${activeTab === 'logins' ? 'active' : ''}`}
+          onClick={() => setActiveTab('logins')}
+        >
+          📋 Login Activity & Security Logs
+        </button>
+        <button 
           className={`subtab-btn ${activeTab === 'audit' ? 'active' : ''}`}
           onClick={() => setActiveTab('audit')}
         >
@@ -424,7 +556,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* TAB 1: User Directory & Access Control */}
+      {/* ── TAB 1: User Directory & Access Control ────────────────────────────── */}
       {activeTab === 'users' && (
         <div className="admin-section">
           <div className="admin-toolbar">
@@ -443,6 +575,10 @@ export default function AdminPage() {
                 <option value="all">All Statuses</option>
                 <option value="pending">⏳ Pending Approval ({pendingCount})</option>
                 <option value="approved">✅ Approved</option>
+                <option value="active">🟢 Active Users</option>
+                <option value="suspended">⛔ Suspended Users ({suspendedCount})</option>
+                <option value="verified">🛡️ Email Verified</option>
+                <option value="unverified">⚠️ Email Unverified ({unverifiedCount})</option>
                 <option value="study_scoped">🔒 Study-Scoped ({studyScopedCount})</option>
                 <option value="sample_scoped">🎯 Sample-Scoped ({sampleScopedCount})</option>
               </select>
@@ -451,26 +587,29 @@ export default function AdminPage() {
               <label>Role:</label>
               <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
                 <option value="all">All Roles</option>
-                <option value="user">User</option>
                 <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="analyst">Analyst</option>
+                <option value="user">User</option>
               </select>
             </div>
           </div>
 
           <div className="admin-table-container">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>User Profile</th>
-                  <th>Role</th>
-                  <th>Account Status</th>
-                  <th>Download Access</th>
-                  <th>Study Access</th>
-                  <th>Sample Access Scope</th>
-                  <th>Created At</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>User Profile</th>
+                    <th>Role</th>
+                    <th>Account Status</th>
+                    <th>Download Access</th>
+                    <th>Study Access</th>
+                    <th>Sample Access Scope</th>
+                    <th>Last Login</th>
+                    <th style={{ textAlign: 'right' }}>Actions & Controls</th>
+                  </tr>
+                </thead>
               <tbody>
                 {filteredUsers.map((u) => {
                   const isUnrestrictedUserStudies = u.allowed_studies === '*' || !Array.isArray(u.allowed_studies)
@@ -479,7 +618,7 @@ export default function AdminPage() {
                   const sampleCount = isUnrestrictedUserSamples ? 0 : u.allowed_samples.length
 
                   return (
-                    <tr key={u.id}>
+                    <tr key={u.id} className={!u.is_active ? 'row-suspended' : ''}>
                       <td>
                         <div className="user-profile-cell">
                           <div className="avatar-circle">
@@ -492,14 +631,35 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td>
-                        <span className={`role-badge ${u.role}`}>
-                          {u.role === 'admin' ? '🛡️ Admin' : '👤 User'}
-                        </span>
+                        <select 
+                          className={`role-select ${u.role}`}
+                          value={u.role}
+                          onChange={(e) => handleUserUpdate(u.id, { role: e.target.value })}
+                          title="Assign user role"
+                        >
+                          <option value="admin">🛡️ Admin</option>
+                          <option value="manager">💼 Manager</option>
+                          <option value="analyst">🔬 Analyst</option>
+                          <option value="user">👤 User</option>
+                        </select>
                       </td>
                       <td>
-                        <span className={`status-badge ${u.is_whitelisted ? 'approved' : 'pending'}`}>
-                          {u.is_whitelisted ? '✅ Approved' : '⏳ Pending Whitelist'}
-                        </span>
+                        <div className="status-badges-stack">
+                          {/* Active / Suspended */}
+                          <span className={`status-pill ${u.is_active ? 'active' : 'suspended'}`}>
+                            {u.is_active ? '🟢 Active' : '⛔ Suspended'}
+                          </span>
+                          
+                          {/* Whitelist */}
+                          <span className={`status-pill ${u.is_whitelisted ? 'approved' : 'pending'}`}>
+                            {u.is_whitelisted ? '✅ Approved' : '⏳ Pending'}
+                          </span>
+
+                          {/* Email Verification */}
+                          <span className={`status-pill ${u.is_verified ? 'verified' : 'unverified'}`}>
+                            {u.is_verified ? '🛡️ Verified' : '⚠️ Unverified'}
+                          </span>
+                        </div>
                       </td>
                       <td>
                         {u.role === 'admin' ? (
@@ -509,7 +669,7 @@ export default function AdminPage() {
                         ) : (
                           <button
                             className={`status-badge ${u.can_download ? 'approved' : 'pending'}`}
-                            style={{ cursor: 'pointer', border: 'none', padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            style={{ cursor: 'pointer', border: 'none', padding: '2.5px 7px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                             onClick={() => handleUserUpdate(u.id, { can_download: !u.can_download })}
                             title="Click to toggle data download permission for this user"
                           >
@@ -553,30 +713,66 @@ export default function AdminPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="text-muted" style={{ fontSize: '0.85rem' }}>
-                        {u.created_at ? u.created_at.split('T')[0] : 'N/A'}
+                      <td className="text-muted" style={{ fontSize: '10.5px', whiteSpace: 'nowrap' }}>
+                        {u.last_login ? new Date(u.last_login).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="action-buttons-group">
+                          {/* Suspend / Reactivate */}
                           <button 
-                            className={u.is_whitelisted ? 'btn-warn-sm' : 'btn-success-sm'}
+                            className={u.is_active ? 'btn-warn-sm' : 'btn-success-sm'}
+                            onClick={() => handleUserUpdate(u.id, { is_active: !u.is_active })}
+                            title={u.is_active ? 'Suspend and disable user account' : 'Reactivate user account'}
+                          >
+                            {u.is_active ? '⛔ Suspend' : '🟢 Restore'}
+                          </button>
+
+                          {/* Whitelist Toggle */}
+                          <button 
+                            className={u.is_whitelisted ? 'btn-secondary-sm' : 'btn-success-sm'}
                             onClick={() => handleUserUpdate(u.id, { is_whitelisted: !u.is_whitelisted })}
+                            title={u.is_whitelisted ? 'Revoke whitelist approval' : 'Approve whitelist access'}
                           >
-                            {u.is_whitelisted ? 'Revoke Access' : 'Approve Account'}
+                            {u.is_whitelisted ? 'Revoke WL' : 'Approve WL'}
                           </button>
-                          <button 
+
+                          {/* Manual Email Verification */}
+                          {!u.is_verified && (
+                            <button
+                              className="btn-secondary-sm"
+                              onClick={() => handleUserUpdate(u.id, { is_verified: true })}
+                              title="Manually verify this user's email address"
+                            >
+                              ✓ Verify
+                            </button>
+                          )}
+
+                          {/* Reset Password */}
+                          <button
                             className="btn-secondary-sm"
-                            onClick={() => handleUserUpdate(u.id, { role: u.role === 'admin' ? 'user' : 'admin' })}
+                            onClick={() => handleAdminResetPassword(u.id, u.email)}
+                            title="Generate a new temporary password for user"
                           >
-                            {u.role === 'admin' ? 'Demote' : 'Make Admin'}
+                            🔑 Reset
                           </button>
+
+                          {/* View Logins */}
+                          <button
+                            className="btn-secondary-sm"
+                            onClick={() => handleViewUserLogins(u.id, u.email)}
+                            title="View recent login events for this user"
+                          >
+                            📋 Logins
+                          </button>
+
+                          {/* Delete */}
                           {currentUser && currentUser.id !== u.id && (
                             <button 
                               className="btn-danger-sm"
                               onClick={() => handleDeleteUser(u.id, u.email)}
                               title="Permanently Delete User Account"
                             >
-                              🗑️ Delete
+                              🗑️
                             </button>
                           )}
                         </div>
@@ -586,11 +782,12 @@ export default function AdminPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: Whitelist Registry */}
+      {/* ── TAB 2: Whitelist Registry ─────────────────────────────────────────── */}
       {activeTab === 'whitelist' && (
         <div className="admin-section grid-2col">
           {/* Add Form */}
@@ -603,8 +800,8 @@ export default function AdminPage() {
               <div className="form-group">
                 <label>Email Pattern or Domain</label>
                 <input 
-                  type="text"
-                  placeholder="e.g. name@company.com or @domain.com"
+                  type="text" 
+                  placeholder="e.g. name@company.com or @domain.com" 
                   value={newPattern}
                   onChange={(e) => setNewPattern(e.target.value)}
                   required
@@ -613,8 +810,8 @@ export default function AdminPage() {
               <div className="form-group">
                 <label>Department / Notes</label>
                 <input 
-                  type="text"
-                  placeholder="e.g. Oncology R&D Team"
+                  type="text" 
+                  placeholder="e.g. Oncology R&D Team" 
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
                 />
@@ -628,80 +825,359 @@ export default function AdminPage() {
           {/* Table */}
           <div className="admin-table-container">
             <h3>Active Whitelist Rules</h3>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Pattern</th>
-                  <th>Scope</th>
-                  <th>Notes</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {whitelist.map((item) => {
-                  const isDomain = item.pattern.startsWith('@')
-                  return (
-                    <tr key={item.id}>
-                      <td className="font-mono">
-                        <b>{item.pattern}</b>
-                      </td>
-                      <td>
-                        <span className={`badge ${isDomain ? 'domain' : 'single'}`}>
-                          {isDomain ? '🌐 Domain-wide' : '👤 Single Email'}
-                        </span>
-                      </td>
-                      <td>{item.notes || '—'}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button 
-                          className="btn-danger-sm"
-                          onClick={() => handleRemoveWhitelist(item.pattern)}
-                        >
-                          Revoke
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Pattern</th>
+                    <th>Scope</th>
+                    <th>Notes</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {whitelist.map((item) => {
+                    const isDomain = item.pattern.startsWith('@')
+                    return (
+                      <tr key={item.id}>
+                        <td className="font-mono">
+                          <b>{item.pattern}</b>
+                        </td>
+                        <td>
+                          <span className={`badge ${isDomain ? 'domain' : 'single'}`}>
+                            {isDomain ? '🌐 Domain-wide' : '👤 Single Email'}
+                          </span>
+                        </td>
+                        <td>{item.notes || '—'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button 
+                            className="btn-danger-sm"
+                            onClick={() => handleRemoveWhitelist(item.pattern)}
+                          >
+                            Revoke
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 3: Audit Logs */}
+      {/* ── TAB 3: Global Login Activity & Security Logs ──────────────────────── */}
+      {activeTab === 'logins' && (
+        <div className="admin-section">
+          <div className="admin-toolbar">
+            <div className="search-input-group">
+              <span className="search-icon">🔍</span>
+              <input 
+                type="text" 
+                placeholder="Search by user email, IP address, or device..." 
+                value={loginSearch}
+                onChange={(e) => setLoginSearch(e.target.value)}
+              />
+            </div>
+            <div className="filter-group">
+              <label>Status:</label>
+              <select value={loginStatusFilter} onChange={(e) => setLoginStatusFilter(e.target.value)}>
+                <option value="all">All Events</option>
+                <option value="SUCCESS">✓ Successful Logins</option>
+                <option value="FAILED">✗ Failed Attempts</option>
+                <option value="BLOCKED">⛔ Blocked / Suspended Logins</option>
+              </select>
+            </div>
+            <button className="btn-secondary-md" onClick={loadGlobalLogins} disabled={loadingLogins}>
+              🔄 Refresh Logs
+            </button>
+          </div>
+
+          <div className="admin-table-container">
+            <h3>Authentication & Security Access Logs</h3>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>User Email</th>
+                    <th>Status</th>
+                    <th>IP Address</th>
+                    <th>Device / User Agent</th>
+                    <th>Event Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLogins.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '32px' }}>
+                        No authentication events match your filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLogins.map((l) => (
+                      <tr key={l.id}>
+                        <td className="text-muted font-mono" style={{ fontSize: '0.85rem' }}>
+                          {l.timestamp ? new Date(l.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td><b>{l.email}</b></td>
+                        <td>
+                          <span className={`status-pill ${l.status.toLowerCase()}`}>
+                            {l.status === 'SUCCESS' ? '✓ Success' : 
+                             l.status === 'BLOCKED' ? '⛔ Blocked' : '✗ Failed'}
+                          </span>
+                        </td>
+                        <td className="monospace-cell">{l.ip_address || '—'}</td>
+                        <td className="ua-cell" title={l.user_agent}>
+                          {l.user_agent ? (l.user_agent.length > 40 ? l.user_agent.substring(0, 40) + '...' : l.user_agent) : 'Unknown Device'}
+                        </td>
+                        <td className="text-muted">{l.reason || '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB 4: Audit Logs ─────────────────────────────────────────────────── */}
       {activeTab === 'audit' && (
         <div className="admin-section">
           <div className="admin-table-container">
             <h3>System Audit Logs</h3>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Actor</th>
-                  <th>Action Code</th>
-                  <th>Event Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td className="text-muted font-mono" style={{ fontSize: '0.85rem' }}>
-                      {log.timestamp ? log.timestamp.replace('T', ' ').substring(0, 19) : ''}
-                    </td>
-                    <td><b>{log.actor_email}</b></td>
-                    <td>
-                      <span className="audit-code-badge">{log.action}</span>
-                    </td>
-                    <td>{log.details}</td>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Actor</th>
+                    <th>Action Code</th>
+                    <th>Event Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="text-muted font-mono" style={{ fontSize: '0.85rem' }}>
+                        {log.timestamp ? log.timestamp.replace('T', ' ').substring(0, 19) : ''}
+                      </td>
+                      <td><b>{log.actor_email}</b></td>
+                      <td>
+                        <span className="audit-code-badge">{log.action}</span>
+                      </td>
+                      <td>{log.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* STUDY & SAMPLE ACCESS RBAC MODAL */}
+      {/* ── MODAL: INVITE USER ────────────────────────────────────────────────── */}
+      {showInviteModal && (
+        <div className="modal-backdrop" onClick={() => setShowInviteModal(false)}>
+          <div className="modal-card invite-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>➕ Invite & Provision Platform User</h3>
+                <span className="modal-subtitle">Directly configure role, permissions, and initial credentials</span>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowInviteModal(false)}>✕</button>
+            </div>
+
+            <form onSubmit={handleInviteSubmit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="inv-email">Work Email Address *</label>
+                  <input
+                    id="inv-email"
+                    type="email"
+                    placeholder="colleague@farcastbio.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="inv-name">Full Name</label>
+                  <input
+                    id="inv-name"
+                    type="text"
+                    placeholder="e.g. Dr. Jordan Lee"
+                    value={inviteFullName}
+                    onChange={(e) => setInviteFullName(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="inv-role">Assigned Platform Role</label>
+                  <select
+                    id="inv-role"
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                  >
+                    <option value="user">👤 User (Standard query & exploration)</option>
+                    <option value="analyst">🔬 Analyst (Advanced querying & analysis)</option>
+                    <option value="manager">💼 Manager (Department oversight & reporting)</option>
+                    <option value="admin">🛡️ Administrator (Full system privileges)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="inv-pass">Temporary Initial Password (Optional)</label>
+                  <input
+                    id="inv-pass"
+                    type="text"
+                    placeholder="Leave blank to auto-generate secure password"
+                    value={inviteTempPassword}
+                    onChange={(e) => setInviteTempPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-checkbox-row" style={{ marginTop: 12 }}>
+                  <label className="checkbox-container">
+                    <input
+                      type="checkbox"
+                      checked={inviteCanDownload}
+                      onChange={(e) => setInviteCanDownload(e.target.checked)}
+                    />
+                    <span className="checkbox-custom"></span>
+                    <span className="checkbox-label">Grant Data Download & Export Permission</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-secondary" onClick={() => setShowInviteModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? 'Creating User...' : 'Provision User Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: CREDENTIALS COPY ───────────────────────────────────────────── */}
+      {credentialsModal && (
+        <div className="modal-backdrop" onClick={() => setCredentialsModal(null)}>
+          <div className="modal-card credentials-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>{credentialsModal.title || '🔑 Account Credentials'}</h3>
+                <span className="modal-subtitle">{credentialsModal.note}</span>
+              </div>
+              <button className="modal-close-btn" onClick={() => setCredentialsModal(null)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="credentials-box">
+                <div className="cred-row">
+                  <span className="cred-label">Account Email:</span>
+                  <span className="cred-val font-mono"><b>{credentialsModal.email}</b></span>
+                </div>
+                {credentialsModal.role && (
+                  <div className="cred-row">
+                    <span className="cred-label">Platform Role:</span>
+                    <span className="cred-val"><b>{credentialsModal.role.toUpperCase()}</b></span>
+                  </div>
+                )}
+                <div className="cred-row highlight">
+                  <span className="cred-label">Temporary Password:</span>
+                  <span className="cred-val font-mono">{credentialsModal.temporary_password}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn-primary"
+                onClick={() => {
+                  const payload = `FarCast Platform Credentials\nEmail: ${credentialsModal.email}\nRole: ${credentialsModal.role || 'User'}\nPassword: ${credentialsModal.temporary_password}`
+                  copyToClipboard(payload)
+                }}
+              >
+                📋 Copy Credentials to Clipboard
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setCredentialsModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: USER SPECIFIC LOGIN HISTORY ─────────────────────────────────── */}
+      {userLoginModal && (
+        <div className="modal-backdrop" onClick={() => setUserLoginModal(null)}>
+          <div className="modal-card user-logins-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>📋 Login History for {userLoginModal.email}</h3>
+                <span className="modal-subtitle">Recent authentication attempts and device records</span>
+              </div>
+              <button className="modal-close-btn" onClick={() => setUserLoginModal(null)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              {userLoginModal.history.length === 0 ? (
+                <p style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
+                  No login events logged for this user.
+                </p>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Status</th>
+                      <th>IP Address</th>
+                      <th>Device / User Agent</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userLoginModal.history.map((h) => (
+                      <tr key={h.id}>
+                        <td className="text-muted font-mono">
+                          {h.timestamp ? new Date(h.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td>
+                          <span className={`status-pill ${h.status.toLowerCase()}`}>
+                            {h.status === 'SUCCESS' ? '✓ Success' : 
+                             h.status === 'BLOCKED' ? '⛔ Blocked' : '✗ Failed'}
+                          </span>
+                        </td>
+                        <td className="monospace-cell">{h.ip_address || '—'}</td>
+                        <td className="ua-cell" title={h.user_agent}>
+                          {h.user_agent ? (h.user_agent.length > 36 ? h.user_agent.substring(0, 36) + '...' : h.user_agent) : 'Unknown'}
+                        </td>
+                        <td className="text-muted">{h.reason || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setUserLoginModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: STUDY & SAMPLE ACCESS RBAC ──────────────────────────────────── */}
       {editingUser && (
         <div className="modal-backdrop" onClick={() => setEditingUser(null)}>
           <div className="modal-card rbac-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -760,7 +1236,7 @@ export default function AdminPage() {
                         return (
                           <label key={study} className={`study-chip ${checked ? 'selected' : ''}`}>
                             <input 
-                              type="checkbox"
+                              type="checkbox" 
                               checked={checked}
                               onChange={() => toggleStudySelection(study)}
                             />
@@ -881,7 +1357,7 @@ export default function AdminPage() {
                     <div>
                       <strong>📥 Download Access Granted</strong>
                       <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)' }}>
-                        User is authorized to export Excel/CSV reports from Bio-Repository and download Cohort datasets.
+                        User is authorized to export Excel/CSV reports from Discovery Cohort and download Response Cohort datasets.
                       </p>
                     </div>
                   </label>

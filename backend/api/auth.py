@@ -21,7 +21,12 @@ security_scheme = HTTPBearer(auto_error=False)
 from database.db_client import get_db_connection
 from database.auth_db import (
     hash_password, verify_password, is_email_whitelisted,
-    init_auth_db, log_audit_event
+    init_auth_db, log_audit_event, create_security_notification,
+    get_user_notifications, mark_notification_as_read, mark_all_notifications_as_read,
+    record_login_event, get_user_login_history, get_all_login_history,
+    create_password_reset_token, verify_and_consume_reset_token,
+    create_email_verification_token, verify_email_token_or_code,
+    direct_verify_email, get_pending_verification_code
 )
 
 def get_db():
@@ -70,12 +75,25 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples, can_download FROM users WHERE email = ?", (email,))
+        cursor.execute("""
+            SELECT id, email, full_name, role, is_whitelisted, allowed_studies, allowed_samples, 
+                   can_download, is_active, is_verified, deactivated_at, deactivation_reason, created_at, last_login 
+            FROM users WHERE LOWER(email) = ?
+        """, (email.strip().lower(),))
         user = cursor.fetchone()
         if not user:
             raise HTTPException(status_code=401, detail="User account not found.")
         
         user_dict = dict(user)
+
+        # Ensure active status
+        is_active = bool(user_dict.get('is_active', 1))
+        if not is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been deactivated. Please contact an administrator or reactivate your account."
+            )
+
         # Parse allowed_studies
         raw_studies = user_dict.get('allowed_studies', '*')
         if raw_studies != '*' and isinstance(raw_studies, str):
@@ -90,12 +108,15 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         else:
             user_dict['allowed_samples'] = '*'
 
-        # Parse download access (admins always have download access)
+        # Parse boolean fields
+        user_dict['is_whitelisted'] = bool(user_dict.get('is_whitelisted', 0))
+        user_dict['is_verified'] = bool(user_dict.get('is_verified', 0))
+        user_dict['is_active'] = is_active
         user_dict['can_download'] = bool(user_dict.get('can_download', 0)) or user_dict.get('role') == 'admin'
 
         # Re-check whitelist dynamically
         if not user_dict['is_whitelisted'] and is_email_whitelisted(user_dict['email']):
-            cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE email = ?", (user_dict['email'],))
+            cursor.execute("UPDATE users SET is_whitelisted = TRUE WHERE LOWER(email) = ?", (user_dict['email'].lower(),))
             conn.commit()
             user_dict['is_whitelisted'] = True
 
@@ -128,3 +149,4 @@ def get_current_admin_user(current_user: dict = Depends(get_current_whitelisted_
             detail="Administrator access required for this operation."
         )
     return current_user
+

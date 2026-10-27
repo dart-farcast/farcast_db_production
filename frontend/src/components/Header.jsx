@@ -2,15 +2,16 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import FarcastLogo from './FarcastLogo'
 import AssayDetailsModal from './AssayDetailsModal'
+import SecurityModal from './SecurityModal'
 
 /**
  * Maps each panel id → the store filter field to add the clicked value into.
  */
 const PANEL_FIELD = {
-  samples:    'indication',
-  drugs:      'drug',
+  samples: 'indication',
+  drugs: 'drug',
   assayTypes: 'assay',
-  studies:    'study',
+  studies: 'study',
 }
 
 function StatPanel({ id, stats, onClose }) {
@@ -28,7 +29,7 @@ function StatPanel({ id, stats, onClose }) {
   if (!stats) return null
 
   let title = ''
-  let rows  = []
+  let rows = []
 
   if (id === 'samples') {
     title = 'Samples by Cancer Type'
@@ -59,7 +60,7 @@ function StatPanel({ id, stats, onClose }) {
     ]
   }
 
-  const field       = PANEL_FIELD[id]
+  const field = PANEL_FIELD[id]
   const activeField = Array.isArray(filters[field]) ? filters[field] : []
 
   const handleRowClick = (clickValue) => {
@@ -104,39 +105,57 @@ function StatPanel({ id, stats, onClose }) {
 }
 
 export default function Header() {
-  const { user, currentView, setCurrentView, logout, preRebootStats } = useStore()
+  const {
+    user, currentView, setCurrentView, logout, preRebootStats,
+    unreadNotificationsCount, fetchNotifications
+  } = useStore()
   const stats = useStore(s => s.stats)
   const [openPanel, setOpenPanel] = useState(null)
   const [showAssayGuide, setShowAssayGuide] = useState(false)
+  const [showSecurityModal, setShowSecurityModal] = useState(false)
+  const [securityInitialTab, setSecurityInitialTab] = useState('notifications')
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications()
+      const interval = setInterval(fetchNotifications, 45000)
+      return () => clearInterval(interval)
+    }
+  }, [user])
 
   const toggle = (id) => setOpenPanel(p => (p === id ? null : id))
   const assayCount = Object.keys(stats?.assay_samples || {}).length
 
   const badges = stats ? [
-    { id: 'samples',       num: stats.samples ?? '—',            label: 'Samples'     },
-    { id: 'qualification', num: stats.qualified_samples ?? '—',  label: 'Qualified'   },
-    { id: 'drugs',         num: stats.drugs   ?? '—',            label: 'Drugs'       },
-    { id: 'assayTypes',    num: assayCount,                       label: 'Assay Types' },
-    { id: 'studies',       num: stats.studies ?? '—',            label: 'Study Types' },
+    { id: 'samples', num: stats.samples ?? '—', label: 'Tumors Profiled' },
+    { id: 'qualification', num: stats.qualified_samples ?? '—', label: 'Qualified' },
+    { id: 'drugs', num: stats.drugs ?? '—', label: 'Drugs' },
+    { id: 'assayTypes', num: assayCount, label: 'Assay Types' },
+    { id: 'studies', num: stats.studies ?? '—', label: 'Study Types' },
   ] : []
+
+  const openSecurity = (tab = 'notifications') => {
+    setSecurityInitialTab(tab)
+    setShowSecurityModal(true)
+  }
 
   return (
     <header className="main-header">
       {/* Left Branding & Mode Indicator */}
       <div className="header-left-group">
         <div className="logo logo-clickable" onClick={() => setCurrentView('hub')} title="Return to Portal Hub">
-          <FarcastLogo height={36} showSub={true} />
+          <FarcastLogo height={34} showSub={true} />
         </div>
 
         {currentView === 'database' && (
           <span className="era-badge-indicator post">
-            Perturbation Samples
+            Response Cohort
           </span>
         )}
 
         {currentView === 'pre_reboot' && (
           <span className="era-badge-indicator pre">
-            Bio-Repository (2017–2020)
+            Discovery Cohort
           </span>
         )}
       </div>
@@ -144,13 +163,14 @@ export default function Header() {
       {/* Center Stats */}
       {currentView === 'database' && (
         <div className="hstats" style={{ position: 'relative' }}>
-          {badges.map(({ id, num, label }) => (
+          {badges.map(({ id, num, label, shortLabel }) => (
             <button
               key={id}
               className={`hstat${openPanel === id ? ' active' : ''}`}
               onClick={() => toggle(id)}
+              title={`View ${label} breakdown`}
             >
-              <b>{num}</b> {label}
+              <b>{num}</b> <span className="hstat-full">{label}</span><span className="hstat-short">{shortLabel || label}</span>
             </button>
           ))}
           {openPanel && (
@@ -166,7 +186,7 @@ export default function Header() {
       {currentView === 'pre_reboot' && preRebootStats && (
         <div className="hstats pre-reboot-hstats">
           <div className="hstat static-badge">
-            <b>{preRebootStats.total_samples?.toLocaleString() || '22,094'}</b> MBTs
+            <b>{preRebootStats.total_samples?.toLocaleString() || '22,094'}</b> Tumors
           </div>
           <div className="hstat static-badge">
             <b>{preRebootStats.with_block_count?.toLocaleString() || '2,773'}</b> Blocks
@@ -181,41 +201,71 @@ export default function Header() {
       {user && (
         <div className="header-user-actions">
           {currentView === 'database' && (
-            <button 
-              className="header-nav-btn assay-guide-btn" 
+            <button
+              className="header-nav-btn assay-guide-btn"
               onClick={() => setShowAssayGuide(true)}
               title="View Assay Details & Readout Descriptions"
             >
-              🔬 Assay Details
+              <span className="btn-icon">🔬</span>
+              <span className="nav-btn-text">Assay Details</span>
             </button>
           )}
 
           {user.role === 'admin' && (
-            <button 
+            <button
               className={`header-nav-btn admin-nav-btn ${currentView === 'admin' ? 'active' : ''}`}
               onClick={() => setCurrentView(currentView === 'admin' ? 'database' : 'admin')}
+              title={currentView === 'admin' ? 'Switch to Database Search Workspace' : 'Open Admin Management Console'}
             >
-              {currentView === 'admin' ? '📊 Database' : '🛡️ Admin'}
+              <span className="btn-icon">{currentView === 'admin' ? '📊' : '🛡️'}</span>
+              <span className="nav-btn-text">{currentView === 'admin' ? 'Database' : 'Admin'}</span>
             </button>
           )}
 
-          <div className="user-profile-badge">
+          {/* Security Notifications Bell Button */}
+          <button
+            className="header-bell-btn"
+            onClick={() => openSecurity('notifications')}
+            title="View Security Notifications & Alerts"
+          >
+            <span className="bell-icon">🔔</span>
+            {unreadNotificationsCount > 0 && (
+              <span className="bell-badge-count">{unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}</span>
+            )}
+          </button>
+
+          {/* User Profile Badge (Clickable to open Security & Account) */}
+          <div
+            className="user-profile-badge interactive"
+            onClick={() => openSecurity('password')}
+            title="Click to view Account Settings, Security & Login History"
+          >
             <span className="user-avatar">{user.full_name ? user.full_name[0].toUpperCase() : user.email[0].toUpperCase()}</span>
             <div className="user-info">
               <span className="user-name">{user.full_name || user.email.split('@')[0]}</span>
-              <span className="user-role">{user.role === 'admin' ? 'Admin' : 'User'}</span>
+              <span className="user-role">{user.role === 'admin' ? 'Admin' : (user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User')}</span>
             </div>
+            <span className="avatar-chevron">▾</span>
           </div>
 
           <button className="header-logout-btn" onClick={logout} title="Sign Out">
-            🚪 Sign Out
+            <span>🚪</span>
+            <span className="logout-text">Sign Out</span>
           </button>
         </div>
       )}
 
       {/* Assay Details Modal */}
       <AssayDetailsModal isOpen={showAssayGuide} onClose={() => setShowAssayGuide(false)} />
+
+      {/* Security & Account Settings Modal */}
+      <SecurityModal
+        isOpen={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+        initialTab={securityInitialTab}
+      />
     </header>
   )
 }
+
 

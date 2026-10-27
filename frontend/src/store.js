@@ -67,10 +67,10 @@ function buildPreRebootQS(filters, page = 0, pageSize = 50, sortCol = 'mbt', sor
   return p.toString()
 }
 
-const savedToken = localStorage.getItem('farcast_token') || null
+const savedToken = localStorage.getItem('farcast_token') || sessionStorage.getItem('farcast_token') || null
 let savedUser = null
 try {
-  savedUser = JSON.parse(localStorage.getItem('farcast_user'))
+  savedUser = JSON.parse(localStorage.getItem('farcast_user') || sessionStorage.getItem('farcast_user'))
 } catch (e) {
   savedUser = null
 }
@@ -81,31 +81,70 @@ export const useStore = create((set, get) => ({
   user: savedUser,
   currentView: savedToken && savedUser?.is_whitelisted ? 'hub' : 'login', // 'hub' | 'database' | 'pre_reboot' | 'admin' | 'login'
   authError: null,
+  notifications: [],
+  unreadNotificationsCount: 0,
 
-  setAuth: (user, token) => {
-    if (token) localStorage.setItem('farcast_token', token)
-    if (user) localStorage.setItem('farcast_user', JSON.stringify(user))
+  setAuth: (user, token, rememberMe = true) => {
+    if (rememberMe) {
+      if (token) localStorage.setItem('farcast_token', token)
+      if (user) localStorage.setItem('farcast_user', JSON.stringify(user))
+      sessionStorage.removeItem('farcast_token')
+      sessionStorage.removeItem('farcast_user')
+    } else {
+      if (token) sessionStorage.setItem('farcast_token', token)
+      if (user) sessionStorage.setItem('farcast_user', JSON.stringify(user))
+      localStorage.removeItem('farcast_token')
+      localStorage.removeItem('farcast_user')
+    }
     set({
       user,
       token,
       currentView: user?.is_whitelisted ? 'hub' : 'login',
       authError: null
     })
+    get().fetchNotifications()
   },
 
   updateUser: (partialUser) => {
     const updated = { ...get().user, ...partialUser }
-    localStorage.setItem('farcast_user', JSON.stringify(updated))
+    if (localStorage.getItem('farcast_token')) {
+      localStorage.setItem('farcast_user', JSON.stringify(updated))
+    } else {
+      sessionStorage.setItem('farcast_user', JSON.stringify(updated))
+    }
     set({ user: updated })
   },
+
+  refreshUser: async () => {
+    const { authFetch, updateUser } = get()
+    if (!get().token) return null
+    try {
+      const res = await authFetch('/api/auth/me')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.user) {
+          updateUser(data.user)
+          return data
+        }
+      }
+    } catch (e) {
+      // non-blocking
+    }
+    return null
+  },
+
 
   logout: () => {
     localStorage.removeItem('farcast_token')
     localStorage.removeItem('farcast_user')
+    sessionStorage.removeItem('farcast_token')
+    sessionStorage.removeItem('farcast_user')
     set({
       user: null,
       token: null,
       currentView: 'login',
+      notifications: [],
+      unreadNotificationsCount: 0,
       results: [],
       total: 0,
       filters: { ...DEFAULT_FILTERS },
@@ -113,6 +152,43 @@ export const useStore = create((set, get) => ({
       preRebootTotal: 0,
       preRebootFilters: { ...DEFAULT_PRE_REBOOT_FILTERS }
     })
+  },
+
+  fetchNotifications: async () => {
+    const { authFetch, user } = get()
+    if (!user) return
+    try {
+      const res = await authFetch('/api/auth/notifications')
+      const data = await res.json()
+      if (data.success && Array.isArray(data.notifications)) {
+        const unread = data.notifications.filter(n => !n.is_read).length
+        set({
+          notifications: data.notifications,
+          unreadNotificationsCount: unread
+        })
+      }
+    } catch (e) {
+      // Non-blocking notification fetch
+    }
+  },
+
+  markNotificationRead: async (id) => {
+    const { authFetch, notifications } = get()
+    try {
+      await authFetch(`/api/auth/notifications/${id}/read`, { method: 'PATCH' })
+      const updated = notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n)
+      const unread = updated.filter(n => !n.is_read).length
+      set({ notifications: updated, unreadNotificationsCount: unread })
+    } catch (e) {}
+  },
+
+  markAllNotificationsRead: async () => {
+    const { authFetch, notifications } = get()
+    try {
+      await authFetch('/api/auth/notifications/read-all', { method: 'POST' })
+      const updated = notifications.map(n => ({ ...n, is_read: 1 }))
+      set({ notifications: updated, unreadNotificationsCount: 0 })
+    } catch (e) {}
   },
 
   setCurrentView: (view) => set({ currentView: view }),

@@ -72,11 +72,11 @@ export default function PreRebootExplorer() {
 
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.json_to_sheet(rows)
-      XLSX.utils.book_append_sheet(wb, ws, "Bio_Repository")
-      XLSX.writeFile(wb, `Bio_Repository_${rows.length}_samples.xlsx`)
+      XLSX.utils.book_append_sheet(wb, ws, "Discovery_Cohort")
+      XLSX.writeFile(wb, `Discovery_Cohort_${rows.length}_tumors.xlsx`)
     } catch (err) {
       console.error("Export error:", err)
-      alert("Failed to export Bio-Repository data.")
+      alert("Failed to export Discovery Cohort data.")
     } finally {
       setDownloadingExcel(false)
     }
@@ -93,14 +93,14 @@ export default function PreRebootExplorer() {
       {/* ── Left Sidebar Filters ── */}
       <aside>
         <div className="sb-section">
-          <div className="sb-head">Bio-Repository Filters</div>
+          <div className="sb-head">Discovery Cohort Filters</div>
 
-          {/* MBT ID Search */}
+          {/* Sample ID Search */}
           <div className="ff">
-            <label>MBT Sample ID</label>
+            <label>Sample ID</label>
             <input
               className="ft-input"
-              placeholder="e.g. 3107, MBRD, MBBP..."
+              placeholder="e.g. 3107, 2401..."
               value={preRebootFilters.mbt}
               onChange={e => setPreRebootFilter('mbt', e.target.value)}
               onKeyDown={e => e.key === 'Enter' && runPreRebootSearch()}
@@ -147,11 +147,11 @@ export default function PreRebootExplorer() {
             apiEndpoint="/api/pre_reboot/autocomplete"
           />
 
-          {/* Hospital */}
+          {/* Clinical Site */}
           <MultiSelect
             field="hospital"
-            label="Hospital"
-            placeholder="e.g. KIDWAI, Manipal..."
+            label="Clinical Site"
+            placeholder="e.g. Kidwai, Manipal..."
             selected={preRebootFilters.hospital}
             onChange={v => setPreRebootFilter('hospital', v)}
             apiEndpoint="/api/pre_reboot/autocomplete"
@@ -204,16 +204,31 @@ export default function PreRebootExplorer() {
 
       {/* ── Main Data Workspace ── */}
       <main>
+        {/* Detail-page intro banner */}
+        <div className="detail-intro-banner discovery">
+          <div className="banner-text">
+            <strong className="banner-title">Discovery Cohort:</strong>
+            Archived FFPE blocks organized into large indication cohorts, ready for target and marker interrogation by H&E, IHC, NanoString and other RNA expression assays.
+          </div>
+          <button 
+            className="btn-back-hub" 
+            onClick={() => setCurrentView('hub')}
+            title="Return to Portal Hub"
+          >
+            ← Back to Hub
+          </button>
+        </div>
+
         {/* Context bar */}
         <div className="ctx-bar">
           <span className="ctx-tag" style={{ background: '#FEF3C7', borderColor: '#FDE68A' }}>
-            <span className="label" style={{ color: '#92400E' }}>Repository</span>
-            <span className="val" style={{ color: '#B45309', fontWeight: 700 }}>Bio-Repository Archive (2017–2020)</span>
+            <span className="label" style={{ color: '#92400E' }}>Cohort</span>
+            <span className="val" style={{ color: '#B45309', fontWeight: 700 }}>Discovery Cohort (FFPE Archive)</span>
           </span>
 
           {preRebootFilters.mbt && (
             <span className="ctx-tag">
-              <span className="label">MBT</span>
+              <span className="label">Sample ID</span>
               <span className="val">{preRebootFilters.mbt}</span>
             </span>
           )}
@@ -230,7 +245,7 @@ export default function PreRebootExplorer() {
             <span className="ctx-tag" key={`fq-${i}`}><span className="label">Final Qual</span><span className="val">{v}</span></span>
           ))}
           {preRebootFilters.hospital?.map((v, i) => (
-            <span className="ctx-tag" key={`h-${i}`}><span className="label">Hospital</span><span className="val">{v}</span></span>
+            <span className="ctx-tag" key={`h-${i}`}><span className="label">Clinical Site</span><span className="val">{v}</span></span>
           ))}
           {preRebootFilters.year?.map((v, i) => (
             <span className="ctx-tag" key={`y-${i}`}><span className="label">Year</span><span className="val">{v}</span></span>
@@ -253,7 +268,7 @@ export default function PreRebootExplorer() {
               className="dl-btn"
               onClick={handleDownloadExcel}
               disabled={downloadingExcel || preRebootTotal === 0}
-              title={!canDownload ? "Download access restricted. Contact an Administrator to request permission." : "Export matching Bio-Repository records to Excel"}
+              title={!canDownload ? "Download access restricted. Contact an Administrator to request permission." : "Export matching Discovery Cohort records to Excel"}
               style={!canDownload ? { opacity: 0.8, cursor: 'not-allowed', background: '#F3F4F6', color: '#6B7280', borderColor: '#D1D5DB' } : {}}
             >
               {downloadingExcel ? 'Exporting...' : !canDownload ? '🔒 Export to Excel' : '📥 Export to Excel'}
@@ -265,8 +280,14 @@ export default function PreRebootExplorer() {
           <div className="spinner" style={{ margin: '60px auto' }} />
         ) : preRebootResults.length === 0 ? (
           <div className="empty">
-            <div className="empty-icon">🏛️</div>
-            <div>No historical samples match the selected filter criteria.</div>
+            <div className="empty-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" strokeDasharray="3 2" />
+                <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+                <circle cx="12" cy="12" r="3" fill="#F59E0B" fillOpacity="0.25" />
+              </svg>
+            </div>
+            <div>No archived tumors match the selected filter criteria.</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -276,7 +297,7 @@ export default function PreRebootExplorer() {
                   <tr>
                     <th style={{ width: 34 }}></th>
                     <th onClick={() => setPreRebootSort('mbt')} style={{ width: 120, cursor: 'pointer' }}>
-                      MBT ID {preRebootSortCol === 'mbt' ? (preRebootSortAsc ? '▲' : '▼') : '⇅'}
+                      Sample ID {preRebootSortCol === 'mbt' ? (preRebootSortAsc ? '▲' : '▼') : '⇅'}
                     </th>
                     <th onClick={() => setPreRebootSort('year')} style={{ width: 85, cursor: 'pointer' }}>
                       Year {preRebootSortCol === 'year' ? (preRebootSortAsc ? '▲' : '▼') : '⇅'}
@@ -287,7 +308,7 @@ export default function PreRebootExplorer() {
                     </th>
                     <th style={{ width: 140 }}>Specific Diagnosis</th>
                     <th style={{ width: 130 }}>Primary Study</th>
-                    <th style={{ width: 130 }}>Hospital</th>
+                    <th style={{ width: 130 }}>Clinical Site</th>
                     <th style={{ width: 90 }}>Age / Sex</th>
                     <th style={{ width: 100 }}>FFPE Block</th>
                     <th style={{ width: 120 }}>Pathology Scores</th>
@@ -407,12 +428,12 @@ export default function PreRebootExplorer() {
                                       <div className="mc-val">{r.year || '—'}</div>
                                     </div>
                                     <div className="meta-cell">
-                                      <div className="mc-label">MBT ID</div>
+                                      <div className="mc-label">Sample ID</div>
                                       <div className="mc-val" style={{ color: '#D97706', fontWeight: 700 }}>{r.mbt || '—'}</div>
                                     </div>
                                     <div className="meta-cell">
-                                      <div className="mc-label">Physician</div>
-                                      <div className="mc-val">{r.physician || '—'}</div>
+                                      <div className="mc-label">Clinical Site & Procedure</div>
+                                      <div className="mc-val">{r.hospital ? `${r.hospital}` : 'Standard Protocol'}</div>
                                     </div>
                                   </div>
                                 </div>

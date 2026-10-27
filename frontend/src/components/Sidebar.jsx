@@ -102,9 +102,9 @@ export default function Sidebar({ onSearch }) {
                 <span className="slider round"></span>
               </label>
             </div>
-            <div className="strict-drug-title">Strict Drug + Control (RXA) Only</div>
+            <div className="strict-drug-title">Matched-control filter</div>
             <div className="strict-drug-hint">
-              Restricts assay readouts, table arms, and downloads strictly to the selected drug arms and control arm.
+              Restricts assay readouts, table arms, and downloads strictly to the selected drug arms and matched baseline control.
             </div>
           </div>
         )}
@@ -112,7 +112,7 @@ export default function Sidebar({ onSearch }) {
         <MultiSelect
           field="arm"
           label="Arm Code"
-          placeholder="e.g. ARM1, RXA, RXB…"
+          placeholder="e.g. Control, Arm 1, Arm 2…"
           selected={filters.arm}
           onChange={v => setFilter('arm', v)}
         />

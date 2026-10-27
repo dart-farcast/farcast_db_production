@@ -10,14 +10,17 @@ import PreRebootExplorer from './components/PreRebootExplorer'
 
 export default function App() {
   const { 
-    token, user, currentView, filters, runSearch, 
-    setStats, setAssayTypes, loadPreRebootStats, authFetch 
+    token, user, currentView, setCurrentView, filters, runSearch, 
+    setStats, setAssayTypes, loadPreRebootStats, authFetch, refreshUser 
   } = useStore()
 
   const total = useStore(s => s.total)
 
-  // Load stats + assay types + pre-reboot stats whenever authenticated & whitelisted
+  // Load stats + assay types + pre-reboot stats + refresh user profile
   useEffect(() => {
+    if (token) {
+      refreshUser()
+    }
     if (token && user?.is_whitelisted) {
       authFetch('/api/stats')
         .then(r => r.json())
@@ -32,14 +35,14 @@ export default function App() {
       // Pre-reboot stats
       loadPreRebootStats()
     }
-  }, [token, user])
+  }, [token])
 
   // Unauthenticated or unwhitelisted -> Render Sign / Login Page
   if (!token || currentView === 'login' || (user && !user.is_whitelisted)) {
     return <SignPage />
   }
 
-  // Active filter tag pills for context bar (Post-reboot)
+  // Active filter tag pills for context bar (Response Cohort)
   const activeTags = []
   const add = (label, vals) => vals?.forEach(v => activeTags.push({ label, val: v }))
   add('Drug',       filters.drug)
@@ -52,7 +55,7 @@ export default function App() {
   add('Assay',      filters.assay)
   if (filters.sample) activeTags.push({ label: 'Sample', val: filters.sample })
   if (filters.strict_drug && filters.drug?.length > 0) {
-    activeTags.push({ label: 'Strict Filter', val: 'Selected Drug(s) + Control Arm (RXA) Only' })
+    activeTags.push({ label: 'Matched Control', val: 'Selected Drug(s) + Matched Control Only' })
   }
 
   return (
@@ -69,6 +72,21 @@ export default function App() {
         <div className="body-layout">
           <Sidebar onSearch={runSearch} />
           <main>
+            {/* Detail intro banner for Response Cohort */}
+            <div className="detail-intro-banner response">
+              <div className="banner-text">
+                <strong className="banner-title">Response Cohort:</strong>
+                Each live tumor is perturbed with several treatments at once, capturing immune activity and cytotoxic response for every arm. A patient receives one treatment; these tumors show what the alternatives would have done.
+              </div>
+              <button 
+                className="btn-back-hub" 
+                onClick={() => setCurrentView('hub')}
+                title="Return to Portal Hub"
+              >
+                ← Back to Hub
+              </button>
+            </div>
+
             {/* Context bar */}
             <div className="ctx-bar">
               {activeTags.length === 0
