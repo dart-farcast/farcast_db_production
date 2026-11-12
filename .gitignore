@@ -55,7 +55,10 @@ cohort_todo2/
 db_watcher/
 docs_and_assets/
 histopathology_cohort_builder/
-scripts/
+scripts/*
+!scripts/ingest_histopathology.py
+!scripts/ingest_flow_cytometry.py
+!scripts/verify_ingestion.py
 
 # Non-Production Scratch Scripts & Temporary Data Tracking Files
 build_complete_mapping.py
@@ -66,10 +69,14 @@ farcast_production_resilience_plan.md
 15oct-cohort/
 8sept_todo_cohort/
 biopharma samples/
+11nov cohort to do/
+BP_shravan_curated_samples/
 *.png
 *.jpeg
 *.jpg
 *.pdf
 *.lnk
+*.xlsx
+*.xls
 Sample Metrics Sheet*.xlsx
 

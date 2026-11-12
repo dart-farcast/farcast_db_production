@@ -38,7 +38,7 @@ app.include_router(admin_routes.router, prefix='/api')
 from fastapi.concurrency import run_in_threadpool
 from api.cache import cache, reload_cache
 
-@app.get('/api/refresh')
+@app.api_route('/api/refresh', methods=['GET', 'POST'])
 async def refresh_cache():
     import traceback
     err = None
@@ -71,6 +71,7 @@ def test_db():
         'metadata_cnt': None,
         'overlay_cnt': None,
         'histo_cnt': None,
+        'flow_cnt': None,
         'error': None
     }
     try:
@@ -79,6 +80,7 @@ def test_db():
             result['metadata_cnt'] = conn.execute(text('SELECT count(*) FROM "metadata"')).scalar()
             result['overlay_cnt'] = conn.execute(text('SELECT count(*) FROM "overlay"')).scalar()
             result['histo_cnt'] = conn.execute(text('SELECT count(*) FROM "assay_histopathology"')).scalar()
+            result['flow_cnt'] = conn.execute(text('SELECT count(*) FROM "assay_flow_cytometry"')).scalar()
     except Exception as e:
         result['error'] = f"{e}\n{traceback.format_exc()}"
 

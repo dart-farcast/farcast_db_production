@@ -68,6 +68,20 @@ CREATE TABLE IF NOT EXISTS overlay (
 CREATE INDEX IF NOT EXISTS idx_overlay_sid ON overlay(sample_id);
 CREATE INDEX IF NOT EXISTS idx_overlay_drug ON overlay(drug);
 
+-- 6. Flow Cytometry Assay Table
+CREATE TABLE IF NOT EXISTS assay_flow_cytometry (
+    "Sample_ID" TEXT,
+    "Name" TEXT,
+    "Study" TEXT,
+    "Arm" TEXT,
+    "Location" TEXT,
+    "Full_Path" TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_assay_flow_sample_id ON assay_flow_cytometry ("Sample_ID");
+CREATE INDEX IF NOT EXISTS idx_assay_flow_arm ON assay_flow_cytometry ("Arm");
+CREATE INDEX IF NOT EXISTS idx_assay_flow_study ON assay_flow_cytometry ("Study");
+
 -- Seed Initial Default Whitelist Rules & Seed Admin
 INSERT INTO whitelisted_emails (pattern, notes) 
 VALUES 

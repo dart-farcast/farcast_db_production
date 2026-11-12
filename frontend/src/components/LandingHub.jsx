@@ -251,7 +251,7 @@ export default function LandingHub() {
                 <div className="compare-mini-cards">
                   <div className="mini-response-card">
                     <div className="mini-response-title">Activity</div>
-                    <div className="mini-response-desc">Cytokine readouts, NanoString IO 360</div>
+                    <div className="mini-response-desc">Cytokine, NanoString IO 360, Flow Cytometry</div>
                   </div>
                   <div className="mini-response-card">
                     <div className="mini-response-title">Cytotoxic response</div>
@@ -267,6 +267,7 @@ export default function LandingHub() {
                   <span className="assay-badge-chip">Cytokines</span>
                   <span className="assay-badge-chip">mIHC</span>
                   <span className="assay-badge-chip">NanoString IO 360</span>
+                  <span className="assay-badge-chip">Flow Cytometry</span>
                 </div>
                 <p className="chips-caption-note">Labels: pathologist H&amp;E + cleaved caspase-3</p>
               </div>

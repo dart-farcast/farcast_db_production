@@ -15,7 +15,9 @@ KNOWN_ASSAYS = {
     'assay_histopathology': 'Histopathology',
     'assay_cytokine':       'Cytokine Release Assay',
     'assay_nanostring':     'NanoString',
-    'assay_mihc':           'mIHC'
+    'assay_mihc':           'mIHC',
+    'assay_flow_cytometry': 'Flow Cytometry',
+    'assay_flow':           'Flow Cytometry'
 }
 
 

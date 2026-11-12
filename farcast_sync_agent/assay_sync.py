@@ -28,6 +28,13 @@ HISTO_COL_MAP = {
     'Cas-3-Immune': 'Cas-3_Immune',
     'cas-3-immune': 'Cas-3_Immune',
     'cas-3_immune': 'Cas-3_Immune',
+    'Tumoral_CD8_count': 'Intratumoral_CD8',
+    'tumoral_cd8_count': 'Intratumoral_CD8',
+    'intratumoral_cd8_count': 'Intratumoral_CD8',
+    'intratumoral_cd8': 'Intratumoral_CD8',
+    'Stromal_CD8_count': 'Stromal_CD8',
+    'stromal_cd8_count': 'Stromal_CD8',
+    'stromal_cd8': 'Stromal_CD8',
 }
 
 CYTO_COL_MAP = {

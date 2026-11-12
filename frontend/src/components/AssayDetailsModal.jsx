@@ -89,7 +89,7 @@ export const ASSAY_DATA_DETAILS = [
   {
     id: 'flowcytometry',
     category: 'Flow Cytometry',
-    excelFile: 'FlowCytometry data.xlsx',
+    excelFile: 'Flow_curated_data.xlsx',
     badgeColor: '#3B82F6',
     description: 'Single-cell immunophenotyping quantifying frequencies of effector, memory, exhausted, and regulatory immune subpopulations.',
     subtypes: [
