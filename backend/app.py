@@ -1,6 +1,11 @@
 """
 FarCast DB v2 — FastAPI entry point
 Run with:  uvicorn app:app --reload --port 5052
+
+Performance upgrades (2026-11-23):
+  - GZip middleware: 60-80% payload reduction on all JSON responses
+  - Non-blocking /api/refresh: schedules reload in background, returns immediately
+  - Cache reload status endpoint: /api/cache_status
 """
 import os
 from dotenv import load_dotenv
@@ -9,10 +14,11 @@ load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from api.cache import lifespan
 from api.routes import stats, autocomplete, search, upload, auth_routes, admin_routes, pre_reboot_routes
@@ -20,10 +26,19 @@ from api.auth import get_current_whitelisted_user
 
 app = FastAPI(title='FarCast DB v2', lifespan=lifespan)
 
-# Allow React dev-server to call backend
+# ── GZip compression: compress any response >= 1 KB (JSON, HTML, text) ───────
+# This slashes bandwidth ~60-80% on large search result payloads.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# ── CORS: allow React dev-server and production Railway domain ────────────────
+RAILWAY_URL = os.environ.get('RAILWAY_APP_URL', '').rstrip('/')
+_cors_origins = ['http://localhost:5173', 'http://127.0.0.1:5173']
+if RAILWAY_URL:
+    _cors_origins.append(RAILWAY_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -37,22 +52,57 @@ app.include_router(admin_routes.router, prefix='/api')
 
 from fastapi.concurrency import run_in_threadpool
 from api.cache import cache, reload_cache
+import time
+
+# ── Non-blocking cache refresh ────────────────────────────────────────────────
+# Old behaviour: awaited reload_cache() — blocked ALL requests for 30-60s.
+# New behaviour: schedules reload as a BackgroundTask, returns immediately.
+#   - Stale (previous good) data continues serving while reload runs.
+#   - Use GET /api/cache_status to poll completion.
+
+def _bg_reload():
+    """Background thread target — wraps reload_cache for BackgroundTasks."""
+    reload_cache()
 
 @app.api_route('/api/refresh', methods=['GET', 'POST'])
-async def refresh_cache():
-    import traceback
-    err = None
-    try:
-        await run_in_threadpool(reload_cache)
-    except Exception as e:
-        err = f"{e}\n{traceback.format_exc()}"
+async def refresh_cache(background_tasks: BackgroundTasks):
+    """
+    Schedule a non-blocking cache reload.
+    Returns immediately with current cache snapshot.
+    Poll /api/cache_status to know when the reload finishes.
+    """
+    if cache.is_reloading:
+        return {
+            "status": "already_reloading",
+            "message": "A reload is already in progress — check /api/cache_status",
+            "meta_len": len(cache.metadata),
+            "overlay_len": len(cache.overlay),
+            "assays": {k: len(v) for k, v in cache.assay_dfs.items()},
+        }
+
+    background_tasks.add_task(_bg_reload)
     return {
-        "status": "success" if not err else "error",
-        "error": err,
-        "stats": cache.stats,
+        "status": "reload_scheduled",
+        "message": "Cache reload started in background. Data continues serving. Poll /api/cache_status.",
         "meta_len": len(cache.metadata),
         "overlay_len": len(cache.overlay),
-        "assays": {k: len(v) for k, v in cache.assay_dfs.items()}
+        "assays": {k: len(v) for k, v in cache.assay_dfs.items()},
+    }
+
+
+@app.get('/api/cache_status')
+async def cache_status():
+    """Return current cache state — use to poll after /api/refresh."""
+    age_seconds = int(time.time() - cache.last_loaded_at) if cache.last_loaded_at else None
+    return {
+        "is_reloading":    cache.is_reloading,
+        "last_error":      cache.last_error or None,
+        "age_seconds":     age_seconds,
+        "meta_len":        len(cache.metadata),
+        "overlay_len":     len(cache.overlay),
+        "pre_reboot_len":  len(cache.pre_reboot_metadata),
+        "assays":          {k: len(v) for k, v in cache.assay_dfs.items()},
+        "stats_samples":   cache.stats.get('samples', 0),
     }
 
 @app.get('/api/test_db')

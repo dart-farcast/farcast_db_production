@@ -88,3 +88,39 @@ VALUES
     ('admin@farcastbio.com', 'Default Admin Email'),
     ('@farcastbio.com', 'FarCast Bio Company Domain')
 ON CONFLICT (pattern) DO NOTHING;
+
+-- ==============================================================================
+-- Performance Indexes (added 2026-11-23)
+-- Run these in Supabase SQL Editor to activate fast-path search.
+-- ==============================================================================
+
+-- 1. GIN full-text search on metadata: enables fast fuzzy/keyword search
+--    NOTE: live table uses mixed-case quoted column names (written by pandas to_sql).
+CREATE INDEX IF NOT EXISTS idx_meta_fts ON metadata USING GIN (
+    to_tsvector(
+        'english',
+        coalesce("Sample_ID",  '') || ' ' ||
+        coalesce("CancerType", '') || ' ' ||
+        coalesce("TumorSite",  '') || ' ' ||
+        coalesce("Hospital",   '') || ' ' ||
+        coalesce("Study",      '')
+    )
+);
+
+-- 2. Composite index for the most common filter combo (Study + CancerType)
+CREATE INDEX IF NOT EXISTS idx_meta_study_cancer ON metadata("Study", "CancerType");
+
+-- 3. Case-insensitive drug search on overlay (avoids full scans for drug lookups)
+CREATE INDEX IF NOT EXISTS idx_overlay_drug_lower ON overlay(lower(drug));
+
+-- 4. Partial index on users: only active whitelisted users are queried on every request
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE INDEX IF NOT EXISTS idx_users_active_whitelisted
+    ON users(email)
+    WHERE is_whitelisted = TRUE AND is_active = TRUE;
+
+-- HOW TO USE the FTS index in queries:
+-- SELECT * FROM metadata
+-- WHERE to_tsvector('english', coalesce("Sample_ID",'') || ' ' || coalesce("CancerType",''))
+--       @@ plainto_tsquery('english', 'lung adenocarcinoma');
+

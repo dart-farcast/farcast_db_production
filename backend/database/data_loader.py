@@ -80,7 +80,11 @@ def find_col(df: pd.DataFrame, aliases: list):
     return None
 
 
-DEFAULT_DB_URL = "postgresql://postgres.nviuiklcusydkxoctlsj:farcast2026@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
+# ── Default DB URL: PgBouncer transaction-mode pooler (port 6543) ─────────────
+# Port 6543 = Supabase PgBouncer (transaction mode) — handles far more concurrent
+# connections than the direct session-mode port 5432.
+# pgbouncer=true disables prepared statements (not supported in transaction mode).
+DEFAULT_DB_URL = "postgresql://postgres.nviuiklcusydkxoctlsj:farcast2026@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 
 def get_db_engine():
     from dotenv import load_dotenv
@@ -89,11 +93,26 @@ def get_db_engine():
     load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
     db_url = os.environ.get('DATABASE_URL', '').strip() or DEFAULT_DB_URL
+
+    # Ensure pgbouncer=true is present (disables prepared statements)
+    if 'pgbouncer=true' not in db_url and ('pooler.supabase.com:6543' in db_url or '6543' in db_url):
+        separator = '&' if '?' in db_url else '?'
+        db_url = f"{db_url}{separator}pgbouncer=true"
+
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
     elif db_url.startswith('postgresql://'):
         db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
-    return create_engine(db_url, connect_args={'connect_timeout': 15})
+
+    return create_engine(
+        db_url,
+        # ── Connection pool tuning ───────────────────────────────────────────
+        pool_size=10,          # keep 10 connections warm
+        max_overflow=20,       # allow up to 30 total under burst load
+        pool_pre_ping=True,    # test connection health before each checkout
+        pool_recycle=300,      # recycle connections every 5 min (avoids stale TCP)
+        connect_args={'connect_timeout': 15}
+    )
 
 
 def load_metadata() -> pd.DataFrame:
@@ -104,6 +123,11 @@ def load_metadata() -> pd.DataFrame:
         if not df.empty and 'Sample_ID' in df.columns:
             print(f"  Successfully loaded {len(df)} metadata rows from Database.")
             df = clean_df(df)
+
+            # Strictly exclude Healthy Blood samples from all portal analysis & counts
+            c_col = next((c for c in ['CancerType', 'Cancer Type', 'cancer_type'] if c in df.columns), None)
+            if c_col:
+                df = df[df[c_col].str.strip().str.lower() != 'healthy blood']
             
             # Enforce Study strictly equals RegisterType (R&D or Biopharma)
             if 'RegisterType' in df.columns:
