@@ -4754,6 +4754,167 @@ input:checked + .slider:before {
   cursor: not-allowed;
 }
 
+/* ── 5b. Security Modal — additional rules ───────────────────────────────── */
+
+/* Fix: mobile scrollbar on tab nav */
+.security-modal-nav {
+  scrollbar-width: none;
+}
+.security-modal-nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* monospace-input — was used in JSX but never defined */
+.monospace-input {
+  font-family: var(--mono);
+  letter-spacing: 2px;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Password strength bar */
+.pwd-strength-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pwd-strength-segments {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.pwd-strength-seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  transition: background 0.25s;
+}
+
+.pwd-strength-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  min-width: 70px;
+  text-align: right;
+}
+
+/* Password requirements checklist */
+.pwd-requirements {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pwd-req-item {
+  font-size: 11.5px;
+  color: #94A3B8;
+  transition: color 0.2s;
+}
+
+.pwd-req-item.met {
+  color: #10B981;
+  font-weight: 600;
+}
+
+/* User profile card in notifications tab */
+.sec-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.sec-profile-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, #7C3AED 100%);
+  color: #FFFFFF;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sec-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sec-profile-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.sec-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid #E2E8F0;
+  background: #F1F5F9;
+  color: #475569;
+}
+
+.sec-profile-badge.admin {
+  background: #EEF2FF;
+  color: #4F46E5;
+  border-color: #C7D2FE;
+}
+
+.sec-profile-badge.verified {
+  background: #ECFDF5;
+  color: #047857;
+  border-color: #A7F3D0;
+}
+
+.sec-profile-badge.unverified {
+  background: #FFFBEB;
+  color: #B45309;
+  border-color: #FDE68A;
+}
+
+.sec-profile-badge.whitelisted {
+  background: #F0FDF4;
+  color: #15803D;
+  border-color: #BBF7D0;
+}
+
+/* Deactivation typed-confirm input */
+.deact-confirm-input {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  border: 2px solid #FECACA;
+  color: #991B1B;
+  background: #FEF2F2;
+  text-align: center;
+  border-radius: var(--radius);
+  padding: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.deact-confirm-input:focus {
+  border-color: #DC2626;
+}
+
 /* ── 6. Admin User Management Elements ───────────────────────────────────── */
 .btn-primary-invite {
   display: inline-flex;

@@ -597,11 +597,5 @@ def read_all_notifications(current_user: dict = Depends(get_current_user)):
     count = mark_all_notifications_as_read(current_user["email"])
     return {"success": True, "count": count}
 
-@router.get("/me")
-def get_me(current_user: dict = Depends(get_current_user)):
-    return {
-        "success": True,
-        "user": current_user
-    }
 
 

@@ -36,20 +36,58 @@ function PasswordInput({ value, onChange, placeholder = '•••••••�
   )
 }
 
+// ── Password strength helper ───────────────────────────────────────────────────
+function getPasswordStrength(pwd) {
+  if (!pwd) return { score: 0, label: '', color: '' }
+  let score = 0
+  if (pwd.length >= 8) score++
+  if (/[A-Z]/.test(pwd)) score++
+  if (/[0-9]/.test(pwd)) score++
+  if (/[^A-Za-z0-9]/.test(pwd)) score++
+  const labels = ['', 'Weak', 'Fair', 'Strong', 'Very Strong']
+  const colors = ['', '#EF4444', '#F59E0B', '#10B981', '#6366F1']
+  return { score, label: labels[score] || 'Weak', color: colors[score] || '#EF4444' }
+}
+
+// ── UA parser helper ───────────────────────────────────────────────────────────
+function parseUserAgent(ua) {
+  if (!ua || ua === 'unknown') return 'Unknown Device'
+  let browser = 'Browser'
+  let os = 'OS'
+
+  if (/Edg\//.test(ua)) browser = 'Edge'
+  else if (/OPR\/|Opera/.test(ua)) browser = 'Opera'
+  else if (/Chrome\//.test(ua)) browser = 'Chrome'
+  else if (/Firefox\//.test(ua)) browser = 'Firefox'
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari'
+  else if (/MSIE|Trident/.test(ua)) browser = 'IE'
+
+  if (/Windows NT 10/.test(ua)) os = 'Win 10'
+  else if (/Windows NT 6\.3/.test(ua)) os = 'Win 8.1'
+  else if (/Windows NT 6\.1/.test(ua)) os = 'Win 7'
+  else if (/Windows/.test(ua)) os = 'Windows'
+  else if (/Mac OS X/.test(ua)) os = 'macOS'
+  else if (/Linux/.test(ua)) os = 'Linux'
+  else if (/Android/.test(ua)) os = 'Android'
+  else if (/iPhone|iPad/.test(ua)) os = 'iOS'
+
+  return `${browser} · ${os}`
+}
+
 export default function SecurityModal({ isOpen, onClose, initialTab = 'notifications' }) {
-  const { 
+  const {
     user, authFetch, logout, updateUser, refreshUser,
-    notifications, unreadNotificationsCount, 
-    fetchNotifications, markNotificationRead, markAllNotificationsRead 
+    notifications, unreadNotificationsCount,
+    fetchNotifications, markNotificationRead, markAllNotificationsRead
   } = useStore()
 
   const [tab, setTab] = useState(initialTab) // 'notifications' | 'password' | 'history' | 'verification' | 'deactivate'
-  
+
   // Change Password state
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  
+
   // Login History state
   const [loginHistory, setLoginHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -57,20 +95,35 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
   // Verification state
   const [verifCode, setVerifCode] = useState('')
   const [activeCodeInfo, setActiveCodeInfo] = useState(null)
-  
+
   // Deactivation state
   const [deactPassword, setDeactPassword] = useState('')
   const [deactReason, setDeactReason] = useState('')
+  const [deactConfirmText, setDeactConfirmText] = useState('')  // typed confirmation
+  const [deactStep, setDeactStep] = useState(1)                // 1 = form, 2 = confirm dialog
+
+  // Separate loading states (fix: shared loading state bug)
+  const [loadingPwd, setLoadingPwd] = useState(false)
+  const [loadingInstant, setLoadingInstant] = useState(false)
+  const [loadingCode, setLoadingCode] = useState(false)
+  const [loadingVerify, setLoadingVerify] = useState(false)
+  const [loadingDeact, setLoadingDeact] = useState(false)
 
   // UI state
-  const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState({ type: '', text: '' })
+
+  const pwdStrength = getPasswordStrength(newPassword)
 
   const checkVerificationState = async () => {
     try {
       const data = await refreshUser()
       if (data?.pending_verification?.has_pending) {
         setActiveCodeInfo(data.pending_verification)
+      } else {
+        // Fix: clear activeCodeInfo if user is already verified or no pending code
+        if (data?.user?.is_verified) {
+          setActiveCodeInfo(null)
+        }
       }
     } catch (e) {}
   }
@@ -111,6 +164,10 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
     if (newTab === 'verification') {
       checkVerificationState()
     }
+    if (newTab === 'deactivate') {
+      setDeactStep(1)
+      setDeactConfirmText('')
+    }
   }
 
   // 1. Password change handler
@@ -123,12 +180,20 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
       return
     }
 
-    if (newPassword.length < 6) {
-      setMsg({ type: 'error', text: 'New password must be at least 6 characters.' })
+    if (newPassword.length < 8) {
+      setMsg({ type: 'error', text: 'New password must be at least 8 characters.' })
+      return
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      setMsg({ type: 'error', text: 'Password must contain at least one uppercase letter.' })
+      return
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setMsg({ type: 'error', text: 'Password must contain at least one number.' })
       return
     }
 
-    setLoading(true)
+    setLoadingPwd(true)
     try {
       const res = await authFetch('/api/auth/change-password', {
         method: 'POST',
@@ -139,7 +204,7 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.detail || 'Password change failed.')
-      
+
       setMsg({ type: 'success', text: 'Password successfully updated! Security notification generated.' })
       setCurrentPassword('')
       setNewPassword('')
@@ -148,7 +213,7 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
     } finally {
-      setLoading(false)
+      setLoadingPwd(false)
     }
   }
 
@@ -162,7 +227,7 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
       return
     }
 
-    setLoading(true)
+    setLoadingVerify(true)
     try {
       const res = await authFetch('/api/auth/verify-email', {
         method: 'POST',
@@ -183,13 +248,13 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
     } finally {
-      setLoading(false)
+      setLoadingVerify(false)
     }
   }
 
   const handleSendCode = async () => {
     setMsg({ type: '', text: '' })
-    setLoading(true)
+    setLoadingCode(true)
     try {
       const res = await authFetch('/api/auth/resend-verification', {
         method: 'POST',
@@ -209,21 +274,22 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
         setActiveCodeInfo({ code: generatedCode })
         setVerifCode(generatedCode)
       }
-      setMsg({ 
-        type: 'success', 
-        text: `Verification code generated: ${generatedCode}. Code has been auto-filled below and sent to your Notifications Bell.` 
+      // Fix: do NOT expose the raw code in the alert message
+      setMsg({
+        type: 'success',
+        text: 'Verification code generated and sent to your Notifications Bell.'
       })
       fetchNotifications()
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
     } finally {
-      setLoading(false)
+      setLoadingCode(false)
     }
   }
 
   const handleInstantVerify = async () => {
     setMsg({ type: '', text: '' })
-    setLoading(true)
+    setLoadingInstant(true)
     try {
       const res = await authFetch('/api/auth/verify-email-instant', {
         method: 'POST',
@@ -240,19 +306,25 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
     } finally {
-      setLoading(false)
+      setLoadingInstant(false)
     }
   }
 
-
-  // 3. Deactivate Account
-  const handleDeactivate = async (e) => {
+  // 3. Deactivate Account — inline confirmation (no browser dialogs)
+  const handleDeactivateSubmit = (e) => {
     e.preventDefault()
-    if (!confirm('Are you absolutely sure you want to deactivate your account? Access to the portal will be suspended until reactivation.')) return
-    
     setMsg({ type: '', text: '' })
-    setLoading(true)
+    // Move to typed-confirm step
+    setDeactStep(2)
+  }
 
+  const handleDeactivateConfirm = async () => {
+    if (deactConfirmText !== 'DEACTIVATE') {
+      setMsg({ type: 'error', text: 'Please type DEACTIVATE exactly to confirm.' })
+      return
+    }
+    setMsg({ type: '', text: '' })
+    setLoadingDeact(true)
     try {
       const res = await authFetch('/api/auth/deactivate', {
         method: 'POST',
@@ -264,30 +336,39 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.detail || 'Failed to deactivate account.')
 
-      alert('Your account has been deactivated. You will now be signed out.')
-      logout()
-      onClose()
+      setMsg({ type: 'success', text: 'Your account has been deactivated. You will now be signed out.' })
+      setTimeout(() => {
+        logout()
+        onClose()
+      }, 1800)
     } catch (err) {
       setMsg({ type: 'error', text: err.message })
+      setDeactStep(1)
     } finally {
-      setLoading(false)
+      setLoadingDeact(false)
     }
   }
+
+  // Last login info from history (displayed in header)
+  const lastLogin = user?.last_login
+    ? new Date(user.last_login).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null
 
   if (!isOpen) return null
 
   return (
     <div className="security-modal-overlay" onClick={onClose}>
       <div className="security-modal-container" onClick={(e) => e.stopPropagation()}>
-        
+
         {/* Modal Header */}
         <div className="security-modal-header">
           <div className="security-header-title">
             <span className="security-icon-badge">🛡️</span>
             <div>
-              <h3>Account Security & Preferences</h3>
+              <h3>Account Security &amp; Preferences</h3>
               <p className="security-subtitle">
                 Logged in as <b>{user?.email}</b> ({user?.role === 'admin' ? 'Administrator' : 'User'})
+                {lastLogin && <span style={{ marginLeft: 8, color: '#94A3B8', fontWeight: 400 }}>· Last login: {lastLogin}</span>}
               </p>
             </div>
           </div>
@@ -296,31 +377,31 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
 
         {/* Modal Navigation Tabs */}
         <div className="security-modal-nav">
-          <button 
+          <button
             className={`sec-nav-btn ${tab === 'notifications' ? 'active' : ''}`}
             onClick={() => handleChangeTab('notifications')}
           >
             🔔 Notifications {unreadNotificationsCount > 0 && <span className="unread-pill">{unreadNotificationsCount}</span>}
           </button>
-          <button 
+          <button
             className={`sec-nav-btn ${tab === 'password' ? 'active' : ''}`}
             onClick={() => handleChangeTab('password')}
           >
-            🔑 Password & Security
+            🔑 Password &amp; Security
           </button>
-          <button 
+          <button
             className={`sec-nav-btn ${tab === 'history' ? 'active' : ''}`}
             onClick={() => handleChangeTab('history')}
           >
             📋 Login History
           </button>
-          <button 
+          <button
             className={`sec-nav-btn ${tab === 'verification' ? 'active' : ''}`}
             onClick={() => handleChangeTab('verification')}
           >
             📧 Email Status {!user?.is_verified && <span className="warning-dot" title="Unverified"></span>}
           </button>
-          <button 
+          <button
             className={`sec-nav-btn danger ${tab === 'deactivate' ? 'active' : ''}`}
             onClick={() => handleChangeTab('deactivate')}
           >
@@ -338,13 +419,35 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
 
         {/* Modal Body */}
         <div className="security-modal-body">
-          
+
           {/* TAB 1: NOTIFICATIONS */}
           {tab === 'notifications' && (
             <div className="sec-tab-content">
+
+              {/* User profile card */}
+              <div className="sec-profile-card">
+                <div className="sec-profile-avatar">
+                  {(user?.full_name || user?.email || '?')[0].toUpperCase()}
+                </div>
+                <div className="sec-profile-info">
+                  <span className="sec-profile-name">{user?.full_name || user?.email}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span className={`sec-profile-badge ${user?.role === 'admin' ? 'admin' : 'user'}`}>
+                      {user?.role === 'admin' ? '⚙️ Admin' : '👤 User'}
+                    </span>
+                    <span className={`sec-profile-badge ${user?.is_verified ? 'verified' : 'unverified'}`}>
+                      {user?.is_verified ? '✅ Verified' : '⚠️ Unverified'}
+                    </span>
+                    {user?.is_whitelisted && (
+                      <span className="sec-profile-badge whitelisted">🔓 Whitelisted</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="sec-section-header">
                 <div>
-                  <h4>Security & Account Notifications</h4>
+                  <h4>Security &amp; Account Notifications</h4>
                   <p className="sec-desc">Real-time alerts regarding logins, password changes, and access updates.</p>
                 </div>
                 {notifications.some(n => !n.is_read) && (
@@ -362,14 +465,14 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
               ) : (
                 <div className="sec-notifications-list">
                   {notifications.map((n) => (
-                    <div 
-                      key={n.id} 
+                    <div
+                      key={n.id}
                       className={`sec-notif-card ${!n.is_read ? 'unread' : ''}`}
                       onClick={() => !n.is_read && markNotificationRead(n.id)}
                     >
                       <div className="sec-notif-icon">
-                        {n.notification_type === 'password' ? '🔒' : 
-                         n.notification_type === 'account' ? '✨' : 
+                        {n.notification_type === 'password' ? '🔒' :
+                         n.notification_type === 'account' ? '✨' :
                          n.notification_type === 'security' ? '🛡️' : 'ℹ️'}
                       </div>
                       <div className="sec-notif-info">
@@ -416,9 +519,44 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                     id="new-pwd"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min 6 characters"
+                    placeholder="Min 8 chars, 1 uppercase, 1 number"
                     required
                   />
+
+                  {/* Password Strength Meter */}
+                  {newPassword.length > 0 && (
+                    <div className="pwd-strength-bar" style={{ marginTop: 8 }}>
+                      <div className="pwd-strength-segments">
+                        {[1, 2, 3, 4].map(i => (
+                          <div
+                            key={i}
+                            className="pwd-strength-seg"
+                            style={{
+                              background: i <= pwdStrength.score ? pwdStrength.color : '#E2E8F0'
+                            }}
+                          />
+                        ))}
+                      </div>
+                      {pwdStrength.label && (
+                        <span className="pwd-strength-label" style={{ color: pwdStrength.color }}>
+                          {pwdStrength.label}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Requirements checklist */}
+                  <div className="pwd-requirements">
+                    <div className={`pwd-req-item ${newPassword.length >= 8 ? 'met' : ''}`}>
+                      {newPassword.length >= 8 ? '✓' : '○'} At least 8 characters
+                    </div>
+                    <div className={`pwd-req-item ${/[A-Z]/.test(newPassword) ? 'met' : ''}`}>
+                      {/[A-Z]/.test(newPassword) ? '✓' : '○'} One uppercase letter
+                    </div>
+                    <div className={`pwd-req-item ${/[0-9]/.test(newPassword) ? 'met' : ''}`}>
+                      {/[0-9]/.test(newPassword) ? '✓' : '○'} One number
+                    </div>
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -432,8 +570,8 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                   />
                 </div>
 
-                <button type="submit" className="auth-btn-submit" disabled={loading}>
-                  {loading ? 'Updating Password...' : 'Save New Password'}
+                <button type="submit" className="auth-btn-submit" disabled={loadingPwd}>
+                  {loadingPwd ? 'Updating Password...' : 'Save New Password'}
                 </button>
               </form>
             </div>
@@ -479,13 +617,13 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                           </td>
                           <td>
                             <span className={`status-badge-chip ${h.status.toLowerCase()}`}>
-                              {h.status === 'SUCCESS' ? '✓ Success' : 
+                              {h.status === 'SUCCESS' ? '✓ Success' :
                                h.status === 'BLOCKED' ? '⛔ Blocked' : '✗ Failed'}
                             </span>
                           </td>
                           <td className="monospace-cell">{h.ip_address || '—'}</td>
                           <td className="ua-cell" title={h.user_agent}>
-                            {h.user_agent ? (h.user_agent.length > 38 ? h.user_agent.substring(0, 38) + '...' : h.user_agent) : 'Unknown Device'}
+                            {parseUserAgent(h.user_agent)}
                           </td>
                         </tr>
                       ))}
@@ -511,18 +649,18 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <span className="verified-big-icon">✅</span>
                     <div>
-                      <h5 style={{ fontSize: '15px' }}>Email Confirmed & Verified</h5>
+                      <h5 style={{ fontSize: '15px' }}>Email Confirmed &amp; Verified</h5>
                       <p>Your work email (<b>{user?.email}</b>) has been fully verified.</p>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, width: '100%', justifyContent: 'space-between', borderTop: '1px solid #A7F3D0', paddingTop: 10 }}>
-                    <span style={{ fontSize: '11.5px', color: '#047857' }}>Status: Protected & Whitelisted</span>
-                    <button 
-                      type="button" 
-                      className="btn-secondary-md" 
+                    <span style={{ fontSize: '11.5px', color: '#047857' }}>Status: Protected &amp; Whitelisted</span>
+                    <button
+                      type="button"
+                      className="btn-secondary-md"
                       style={{ padding: '4px 10px', fontSize: '11.5px' }}
                       onClick={checkVerificationState}
-                      disabled={loading}
+                      disabled={loadingInstant || loadingCode}
                     >
                       🔄 Refresh Status
                     </button>
@@ -566,9 +704,9 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                       className="auth-btn-submit"
                       style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', marginTop: 4 }}
                       onClick={handleInstantVerify}
-                      disabled={loading}
+                      disabled={loadingInstant}
                     >
-                      {loading ? 'Verifying...' : '⚡ Verify Email Instantly'}
+                      {loadingInstant ? 'Verifying...' : '⚡ Verify Email Instantly'}
                     </button>
                   </div>
 
@@ -591,9 +729,9 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                         className="btn-secondary-md"
                         style={{ padding: '5px 12px', fontSize: '12px' }}
                         onClick={handleSendCode}
-                        disabled={loading}
+                        disabled={loadingCode}
                       >
-                        {loading ? 'Generating...' : '📩 Generate / Send Code'}
+                        {loadingCode ? 'Generating...' : '📩 Generate / Send Code'}
                       </button>
                     </div>
 
@@ -651,10 +789,10 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                       <button
                         type="submit"
                         className="auth-btn-submit"
-                        disabled={loading || !verifCode.trim()}
+                        disabled={loadingVerify || !verifCode.trim()}
                         style={{ width: '100%' }}
                       >
-                        {loading ? 'Confirming...' : '✓ Confirm & Verify Code'}
+                        {loadingVerify ? 'Confirming...' : '✓ Confirm & Verify Code'}
                       </button>
                     </form>
                   </div>
@@ -682,32 +820,87 @@ export default function SecurityModal({ isOpen, onClose, initialTab = 'notificat
                 </p>
               </div>
 
-              <form className="auth-form" onSubmit={handleDeactivate} style={{ marginTop: 16 }}>
-                <div className="form-group">
-                  <label htmlFor="deact-pwd">Confirm Current Password</label>
-                  <PasswordInput
-                    id="deact-pwd"
-                    value={deactPassword}
-                    onChange={(e) => setDeactPassword(e.target.value)}
-                    required
-                  />
-                </div>
+              {deactStep === 1 && (
+                <form className="auth-form" onSubmit={handleDeactivateSubmit} style={{ marginTop: 16 }}>
+                  <div className="form-group">
+                    <label htmlFor="deact-pwd">Confirm Current Password</label>
+                    <PasswordInput
+                      id="deact-pwd"
+                      value={deactPassword}
+                      onChange={(e) => setDeactPassword(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="deact-reason">Reason for Suspension (Optional)</label>
-                  <input
-                    id="deact-reason"
-                    type="text"
-                    placeholder="e.g. Project completion, sabbatical, or department transfer"
-                    value={deactReason}
-                    onChange={(e) => setDeactReason(e.target.value)}
-                  />
-                </div>
+                  <div className="form-group">
+                    <label htmlFor="deact-reason">Reason for Suspension (Optional)</label>
+                    <input
+                      id="deact-reason"
+                      type="text"
+                      placeholder="e.g. Project completion, sabbatical, or department transfer"
+                      value={deactReason}
+                      onChange={(e) => setDeactReason(e.target.value)}
+                    />
+                  </div>
 
-                <button type="submit" className="btn-danger-submit" disabled={loading}>
-                  {loading ? 'Deactivating...' : 'Deactivate & Suspend Account'}
-                </button>
-              </form>
+                  <button type="submit" className="btn-danger-submit" disabled={!deactPassword}>
+                    Continue to Confirm Deactivation →
+                  </button>
+                </form>
+              )}
+
+              {deactStep === 2 && (
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{
+                    background: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: 8,
+                    padding: '14px 16px'
+                  }}>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#991B1B', fontWeight: 600 }}>
+                      ⚠️ Final Confirmation Required
+                    </p>
+                    <p style={{ margin: '6px 0 0', fontSize: '12.5px', color: '#B91C1C' }}>
+                      Type <b style={{ fontFamily: 'var(--mono)', letterSpacing: 1 }}>DEACTIVATE</b> in the box below to confirm account suspension.
+                    </p>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                      Type "DEACTIVATE" to confirm
+                    </label>
+                    <input
+                      type="text"
+                      className="deact-confirm-input"
+                      placeholder="DEACTIVATE"
+                      value={deactConfirmText}
+                      onChange={(e) => setDeactConfirmText(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      type="button"
+                      className="btn-secondary-md"
+                      style={{ flex: 1 }}
+                      onClick={() => { setDeactStep(1); setDeactConfirmText(''); setMsg({ type: '', text: '' }) }}
+                      disabled={loadingDeact}
+                    >
+                      ← Go Back
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-danger-submit"
+                      style={{ flex: 2, marginTop: 0 }}
+                      onClick={handleDeactivateConfirm}
+                      disabled={loadingDeact || deactConfirmText !== 'DEACTIVATE'}
+                    >
+                      {loadingDeact ? 'Deactivating...' : 'Deactivate & Suspend Account'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
