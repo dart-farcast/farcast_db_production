@@ -11,7 +11,8 @@ export default function PreRebootExplorer() {
     preRebootSortCol, preRebootSortAsc, preRebootLoading,
     preRebootStats, setPreRebootFilter, setPreRebootSort,
     setPreRebootPage, runPreRebootSearch, clearPreRebootFilters,
-    authFetch, setPreRebootStats, setCurrentView
+    authFetch, setPreRebootStats, setCurrentView,
+    mobileFiltersOpen, toggleMobileFilters, setMobileFiltersOpen
   } = useStore()
 
   const [openRows, setOpenRows] = useState(new Set())
@@ -89,9 +90,23 @@ export default function PreRebootExplorer() {
   const imageCount = stats.image_samples_count?.toLocaleString() ?? '—'
 
   return (
-    <div className="body-layout">
+    <div className={`body-layout${mobileFiltersOpen ? ' filters-open' : ''}`}>
+      {mobileFiltersOpen && (
+        <div className="mobile-drawer-backdrop" onClick={() => setMobileFiltersOpen(false)} />
+      )}
       {/* ── Left Sidebar Filters ── */}
       <aside>
+        <div className="mobile-drawer-header">
+          <span>Discovery Filters</span>
+          <button
+            type="button"
+            className="mobile-drawer-close"
+            onClick={() => setMobileFiltersOpen(false)}
+            aria-label="Close filters"
+          >
+            ✕
+          </button>
+        </div>
         <div className="sb-section">
           <div className="sb-head">Discovery Cohort Filters</div>
 
@@ -196,7 +211,7 @@ export default function PreRebootExplorer() {
 
           {/* Search & Reset Buttons */}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn-go" onClick={runPreRebootSearch}>🔍 Search</button>
+            <button className="btn-go" onClick={() => { runPreRebootSearch(); setMobileFiltersOpen(false); }}>🔍 Search</button>
             <button className="btn-clr" onClick={clearPreRebootFilters}>Reset</button>
           </div>
         </div>
@@ -204,6 +219,22 @@ export default function PreRebootExplorer() {
 
       {/* ── Main Data Workspace ── */}
       <main>
+        {/* Mobile / Tablet Filter Toggle Bar */}
+        <div className="mobile-filter-bar">
+          <button
+            type="button"
+            className="mobile-filter-toggle-btn"
+            onClick={toggleMobileFilters}
+          >
+            <span>☰ Discovery Filters</span>
+          </button>
+          {preRebootTotal > 0 && (
+            <span className="mobile-res-count">
+              <b>{preRebootTotal.toLocaleString()}</b> tumors
+            </span>
+          )}
+        </div>
+
         {/* Detail-page intro banner */}
         <div className="detail-intro-banner discovery">
           <div className="banner-text">

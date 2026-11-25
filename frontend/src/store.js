@@ -191,7 +191,12 @@ export const useStore = create((set, get) => ({
     } catch (e) {}
   },
 
-  setCurrentView: (view) => set({ currentView: view }),
+  setCurrentView: (view) => set({ currentView: view, mobileFiltersOpen: false }),
+
+  // Mobile / tablet filter drawer state
+  mobileFiltersOpen: false,
+  toggleMobileFilters: () => set(s => ({ mobileFiltersOpen: !s.mobileFiltersOpen })),
+  setMobileFiltersOpen: (open) => set({ mobileFiltersOpen: Boolean(open) }),
 
   // Authenticated fetch wrapper
   authFetch: async (url, options = {}) => {

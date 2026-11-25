@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import MultiSelect from './MultiSelect'
 
 export default function Sidebar({ onSearch }) {
-  const { filters, setFilter, clearFilters, stats, assayTypes } = useStore()
+  const { filters, setFilter, clearFilters, stats, assayTypes, setMobileFiltersOpen } = useStore()
 
   const activeAssays = filters.assay
 
@@ -20,6 +20,17 @@ export default function Sidebar({ onSearch }) {
 
   return (
     <aside>
+      <div className="mobile-drawer-header">
+        <span>Filter Cohort</span>
+        <button
+          type="button"
+          className="mobile-drawer-close"
+          onClick={() => setMobileFiltersOpen(false)}
+          aria-label="Close filters"
+        >
+          ✕
+        </button>
+      </div>
       {/* ── Qualification Status Toggle & Metrics ──────────────────────── */}
       <div className="sb-section qual-toggle-section">
         <div className="qual-toggle-card">

@@ -2520,9 +2520,9 @@ input:checked + .slider:before {
 /* Era Cards Grid */
 .hub-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
   gap: 24px;
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto;
   width: 100%;
 }
@@ -2935,7 +2935,7 @@ input:checked + .slider:before {
 
 .hub-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
   gap: 28px;
   max-width: 1100px;
   margin: 0 auto;
@@ -5446,6 +5446,416 @@ input:checked + .slider:before {
   }
   .detail-intro-banner .banner-text {
     text-align: left;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPREHENSIVE RESPONSIVE LAYOUT & MULTI-DEVICE SUPPORT
+   Covers: Ultrawide (>=1536px), Laptop (<=1280px), Tablet (<=1024px),
+           Mobile (<=768px), Small Phone (<=480px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Desktop defaults for mobile-only drawer controls ────────────────────── */
+.mobile-filter-bar {
+  display: none;
+}
+
+.mobile-drawer-header {
+  display: none;
+}
+
+.mobile-drawer-backdrop {
+  display: none;
+}
+
+/* Ensure all data tables scroll horizontally within their container */
+.table-wrap,
+.admin-table-scroll,
+.hub-table-wrapper,
+.sec-history-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* ── 1. Ultrawide Monitors (>= 1536px) ───────────────────────────────────── */
+@media (min-width: 1536px) {
+  .body-layout {
+    grid-template-columns: 310px 1fr;
+  }
+  .hub-hero,
+  .hub-cards-grid,
+  .hub-overview-section {
+    max-width: 1280px;
+  }
+  .admin-container {
+    max-width: 1440px;
+  }
+}
+
+/* ── 2. Compact Laptops (<= 1280px) ──────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .main-header {
+    padding: 0 14px;
+    gap: 10px;
+  }
+  .body-layout {
+    grid-template-columns: 265px 1fr;
+  }
+  .hub-container {
+    padding: 24px 20px;
+  }
+}
+
+/* ── 3. Tablets & Small Laptops (<= 1024px) — Slide-Over Filter Drawer ───── */
+@media (max-width: 1024px) {
+  .app-layout {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .main-header {
+    height: 56px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  /* Hide inline header stat pills on <= 960px below; keep compact here */
+  .hstats {
+    gap: 4px;
+  }
+  .hstat {
+    padding: 3px 6px;
+    font-size: 10.5px;
+  }
+
+  .body-layout {
+    grid-template-columns: 1fr;
+    overflow: visible;
+    min-height: calc(100dvh - 56px);
+  }
+
+  .pre-reboot-layout {
+    height: auto;
+    min-height: calc(100dvh - 56px);
+    overflow: visible;
+  }
+
+  main {
+    overflow: visible;
+    min-width: 0;
+  }
+
+  /* Filter Toggle Bar inside main workspace */
+  .mobile-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #FFFFFF;
+    border-bottom: 1px solid var(--bdr);
+    position: sticky;
+    top: 56px;
+    z-index: 90;
+  }
+
+  .mobile-filter-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    background: #FAF5FF;
+    border: 1px solid #D8B4FE;
+    color: #7E22CE;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .mobile-filter-toggle-btn:hover {
+    background: #F3E8FF;
+  }
+
+  .mobile-filter-count {
+    background: var(--accent);
+    color: #FFFFFF;
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .mobile-res-count {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .mobile-res-count b {
+    color: var(--txt);
+  }
+
+  /* Slide-over Aside Drawer */
+  .body-layout > aside {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    width: min(320px, 86vw);
+    z-index: 300;
+    transform: translateX(-105%);
+    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.22);
+    border-right: 1px solid var(--bdr);
+    overflow-y: auto;
+  }
+
+  .body-layout.filters-open > aside {
+    transform: translateX(0);
+  }
+
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 56px 0 0 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 250;
+  }
+
+  .mobile-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: #FAF5FF;
+    border-bottom: 1px solid #E9D5FF;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--farcast-navy);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .mobile-drawer-close {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #475569;
+    cursor: pointer;
+  }
+
+  /* Admin Console adjustments */
+  .admin-container {
+    padding: 18px;
+  }
+  .admin-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+/* ── 4. Header Stat Pills Collapse (<= 960px) ────────────────────────────── */
+@media (max-width: 960px) {
+  .hstats {
+    display: none;
+  }
+  .era-badge-indicator {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+}
+
+/* ── 5. Mobile & Large Phones (<= 768px) ─────────────────────────────────── */
+@media (max-width: 768px) {
+  .main-header {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .header-left-group {
+    gap: 8px;
+  }
+  .header-user-actions {
+    gap: 5px;
+  }
+  .header-nav-btn {
+    padding: 5px 8px;
+  }
+  .header-bell-btn {
+    padding: 5px 8px;
+    font-size: 14px;
+  }
+
+  /* Landing Hub */
+  .hub-container {
+    padding: 18px 14px;
+    gap: 18px;
+  }
+  .hub-title {
+    font-size: 22px;
+  }
+  .hub-subtitle {
+    font-size: 13px;
+  }
+  .hub-combined-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .combined-kpi-num {
+    font-size: 24px;
+  }
+  .combined-right-pills {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .hub-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .hub-card {
+    padding: 18px;
+    gap: 14px;
+  }
+  .hub-kpi-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .hub-flow-strip {
+    flex-wrap: wrap;
+    justify-content: center;
+    border-radius: 14px;
+    width: 100%;
+    padding: 10px 12px;
+    gap: 6px;
+    box-sizing: border-box;
+  }
+
+  /* Context bar & Results Toolbar */
+  .ctx-bar {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .results-toolbar,
+  .pagination-bar,
+  .pre-banner-top {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pre-reboot-banner {
+    padding: 12px 14px;
+  }
+
+  /* Admin Console */
+  .admin-container {
+    padding: 12px;
+  }
+  .admin-hero-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 12px;
+  }
+  .admin-hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .admin-subtabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-subtabs::-webkit-scrollbar {
+    display: none;
+  }
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  /* Modals (Security, Assay Details, Admin) */
+  .security-modal-overlay,
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .security-modal-container,
+  .modal-card {
+    max-height: 92dvh;
+    width: 100%;
+  }
+  .security-modal-header,
+  .modal-header {
+    padding: 14px 16px;
+  }
+  .security-modal-body,
+  .modal-body {
+    padding: 16px;
+  }
+  .security-modal-nav {
+    padding: 8px 12px;
+  }
+  .sec-profile-card {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+
+/* ── 6. Small Phones (<= 480px) ──────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .era-badge-indicator {
+    display: none;
+  }
+  .user-profile-badge .user-info {
+    display: none;
+  }
+  .user-profile-badge.interactive {
+    padding: 3px 5px;
+  }
+  .header-logout-btn {
+    padding: 5px 8px;
+  }
+
+  .stat-panel {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    top: 58px;
+  }
+
+  .auth-container {
+    padding: 12px;
+  }
+  .auth-card {
+    padding: 22px 16px;
+  }
+
+  .admin-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hub-title {
+    font-size: 20px;
+  }
+  .combined-left {
+    gap: 10px;
+  }
+  .combined-kpi-num {
+    font-size: 22px;
   }
 }
 

@@ -11,7 +11,8 @@ import PreRebootExplorer from './components/PreRebootExplorer'
 export default function App() {
   const { 
     token, user, currentView, setCurrentView, filters, runSearch, 
-    setStats, setAssayTypes, loadPreRebootStats, authFetch, refreshUser 
+    setStats, setAssayTypes, loadPreRebootStats, authFetch, refreshUser,
+    mobileFiltersOpen, toggleMobileFilters, setMobileFiltersOpen
   } = useStore()
 
   const total = useStore(s => s.total)
@@ -69,9 +70,31 @@ export default function App() {
       ) : currentView === 'admin' ? (
         <AdminPage />
       ) : (
-        <div className="body-layout">
-          <Sidebar onSearch={runSearch} />
+        <div className={`body-layout${mobileFiltersOpen ? ' filters-open' : ''}`}>
+          {mobileFiltersOpen && (
+            <div className="mobile-drawer-backdrop" onClick={() => setMobileFiltersOpen(false)} />
+          )}
+          <Sidebar onSearch={() => { runSearch(); setMobileFiltersOpen(false); }} />
           <main>
+            {/* Mobile / Tablet Filter Toggle Bar */}
+            <div className="mobile-filter-bar">
+              <button
+                type="button"
+                className="mobile-filter-toggle-btn"
+                onClick={toggleMobileFilters}
+              >
+                <span>☰ Filters</span>
+                {activeTags.length > 0 && (
+                  <span className="mobile-filter-count">{activeTags.length}</span>
+                )}
+              </button>
+              {total > 0 && (
+                <span className="mobile-res-count">
+                  <b>{total}</b> result{total !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
             {/* Detail intro banner for Response Cohort */}
             <div className="detail-intro-banner response">
               <div className="banner-text">
